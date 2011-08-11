@@ -1,0 +1,51 @@
+# Example Makefile for ROSE users
+# This makefile is provided as an example of how to use ROSE when ROSE is
+# installed (using "make install").  This makefile is tested as part of the
+# "make distcheck" rule (run as part of tests before any SVN checkin).
+# The test of this makefile can also be run by using the "make installcheck"
+# rule (run as part of "make distcheck").
+
+
+# Location of include directory after "make install"
+ROSE_INCLUDE_DIR = /mnt/netapp/home2/nchaimov/src/rose-0.9.5a-15674/compileTreeNoJava/include
+
+# Location of Boost include directory
+BOOST_CPPFLAGS = -I/mnt/netapp/home2/nchaimov/boost/include
+
+# Location of Dwarf include and lib (if ROSE is configured to use Dwarf)
+ROSE_DWARF_INCLUDES = /mnt/netapp/home2/nchaimov/src/dwarf-20110612/libdwarf
+ROSE_DWARF_LIBS_WITH_PATH = /mnt/netapp/home2/nchaimov/src/dwarf-20110612/libdwarf
+
+# Location of library directory after "make install"
+ROSE_LIB_DIR =  /mnt/netapp/home2/nchaimov/src/rose-0.9.5a-15674/compileTreeNoJava/lib
+
+ROSE_HOME =  /mnt/netapp/home2/nchaimov/src/rose-0.9.5a-15674/compileTreeNoJava
+
+CC                    = gcc
+CXX                   = g++
+CPPFLAGS              = $(BOOST_CPPFLAGS) -I$(ROSE_DWARF_INCLUDES)
+#CXXCPPFLAGS           = @CXXCPPFLAGS@
+CXXFLAGS              = -g -Wall 
+LDFLAGS               = -L$(ROSE_DWARF_LIBS_WITH_PATH) -L/mnt/netapp/home2/nchaimov/lib -ldwarf -lrose
+
+#ROSE_LIBS = $(ROSE_LIB_DIR)/librose.la
+
+# Location of source code
+ROSE_SOURCE_DIR = ./src
+ 
+
+executableFiles = printRoseAST dwarven
+
+
+# Default make rule to use
+all: $(executableFiles)
+
+clean:
+	rm -f $(executableFiles)
+
+printRoseAST: $(ROSE_SOURCE_DIR)/printRoseAST.cpp
+	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ $(ROSE_SOURCE_DIR)/printRoseAST.cpp $(LIBS_WITH_RPATH) -L$(ROSE_LIB_DIR) $(LDFLAGS)  
+
+dwarven: $(ROSE_SOURCE_DIR)/dwarven.cpp
+	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ $(ROSE_SOURCE_DIR)/dwarven.cpp $(LIBS_WITH_RPATH) -L$(ROSE_LIB_DIR) $(LDFLAGS)  
+
