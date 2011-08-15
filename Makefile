@@ -34,7 +34,7 @@ LDFLAGS               = -L$(ROSE_DWARF_LIBS_WITH_PATH) -L/mnt/netapp/home2/nchai
 ROSE_SOURCE_DIR = ./src
  
 
-executableFiles = printRoseAST dwarven
+executableFiles = printRoseAST undwarf
 
 
 # Default make rule to use
@@ -46,6 +46,6 @@ clean:
 printRoseAST: $(ROSE_SOURCE_DIR)/printRoseAST.cpp
 	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ $(ROSE_SOURCE_DIR)/printRoseAST.cpp $(LIBS_WITH_RPATH) -L$(ROSE_LIB_DIR) $(LDFLAGS)  
 
-dwarven: $(ROSE_SOURCE_DIR)/dwarven.cpp
-	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ $(ROSE_SOURCE_DIR)/dwarven.cpp $(LIBS_WITH_RPATH) -L$(ROSE_LIB_DIR) $(LDFLAGS)  
+undwarf: $(ROSE_SOURCE_DIR)/undwarf.cpp
+	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ $(ROSE_SOURCE_DIR)/undwarf.cpp $(LIBS_WITH_RPATH) -L$(ROSE_LIB_DIR) $(LDFLAGS)  
 
