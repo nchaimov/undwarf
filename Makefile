@@ -26,7 +26,7 @@ CXX                   = g++
 CPPFLAGS              = $(BOOST_CPPFLAGS) -I$(ROSE_DWARF_INCLUDES)
 #CXXCPPFLAGS           = @CXXCPPFLAGS@
 CXXFLAGS              = -g -Wall 
-LDFLAGS               = -L$(ROSE_DWARF_LIBS_WITH_PATH) -L/mnt/netapp/home2/nchaimov/lib -ldwarf -lrose
+LDFLAGS               = -L$(ROSE_DWARF_LIBS_WITH_PATH) -L/mnt/netapp/home2/nchaimov/boost/lib -L/mnt/netapp/home2/nchaimov/lib --static -pthread -Wl,--start-group -lpthread -lboost_system -lboost_wave -lhpdf -lrose -lm -lboost_date_time -lboost_thread -lboost_filesystem -lgcrypt -lgpg-error -lboost_program_options -lboost_regex dlstubs.o -lelf -ldwarf -Wl,--end-group 
 
 #ROSE_LIBS = $(ROSE_LIB_DIR)/librose.la
 
@@ -41,11 +41,19 @@ executableFiles = printRoseAST undwarf
 all: $(executableFiles)
 
 clean:
-	rm -f $(executableFiles)
+	rm -f $(executableFiles) *.o
 
 printRoseAST: $(ROSE_SOURCE_DIR)/printRoseAST.cpp
 	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ $(ROSE_SOURCE_DIR)/printRoseAST.cpp $(LIBS_WITH_RPATH) -L$(ROSE_LIB_DIR) $(LDFLAGS)  
 
-undwarf: $(ROSE_SOURCE_DIR)/undwarf.cpp
-	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ $(ROSE_SOURCE_DIR)/undwarf.cpp $(LIBS_WITH_RPATH) -L$(ROSE_LIB_DIR) $(LDFLAGS)  
+undwarf.o: $(ROSE_SOURCE_DIR)/undwarf.cpp $(ROSE_SOURCE_DIR)/typeTable.h
+	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ -c $(ROSE_SOURCE_DIR)/undwarf.cpp
 
+typeTable.o: $(ROSE_SOURCE_DIR)/typeTable.cpp $(ROSE_SOURCE_DIR)/typeTable.h
+	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ -c $(ROSE_SOURCE_DIR)/typeTable.cpp  
+
+DwarfROSEConverter.o: $(ROSE_SOURCE_DIR)/DwarfROSEConverter.cpp $(ROSE_SOURCE_DIR)/DwarfROSEConverter.h
+	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ -c $(ROSE_SOURCE_DIR)/DwarfROSEConverter.cpp  
+
+undwarf: undwarf.o typeTable.o DwarfROSEConverter.o
+	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ $+ $(LIBS_WITH_RPATH) -L$(ROSE_LIB_DIR) $(LDFLAGS) 

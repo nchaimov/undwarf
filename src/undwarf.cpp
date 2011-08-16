@@ -15,7 +15,11 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 
+#include "typeTable.h"
+#include "DwarfROSEConverter.h"
+
 typedef std::map<std::string, SgAsmDwarfConstruct*> offsetMapType;
+TypeTable & typeTable = TypeTable::getInstance();
 
 class OffsetAttribute : public AstAttribute {
     public:
@@ -153,13 +157,11 @@ std::string typeToName(SgAsmDwarfConstruct * d) {
     
         default:
             std::cerr << "Unhandled type " << d->class_name() << std::endl;
-
     }
-
-
-
     return s.str();
 }
+
+
 
 int main ( int argc, char* argv[] ) {
 	
