@@ -41,56 +41,6 @@ class OffsetAttribute : public AstAttribute {
 
 const std::string OffsetAttribute::OFFSET_ATTRIBUTE = "OFFSET_ATTRIBUTE";
 
-class InheritedAttribute {
-    public:
-        int depth;
-        SgAsmDwarfSubprogram * parentSubprogram;
-
-        InheritedAttribute(int d, SgAsmDwarfSubprogram * s) : depth(d), parentSubprogram(s) {};
-        InheritedAttribute( const InheritedAttribute & X) : depth(X.depth), parentSubprogram(X.parentSubprogram) {};
-};
-
-class DwarfTraversal : public AstTopDownProcessing<InheritedAttribute> {
-    public:
-        virtual InheritedAttribute evaluateInheritedAttribute(SgNode * n, InheritedAttribute inheritedAttribute);
-        
-};
-
-InheritedAttribute DwarfTraversal::evaluateInheritedAttribute(SgNode * n, InheritedAttribute inheritedAttribute) {
-    int depth = inheritedAttribute.depth;
-    SgAsmDwarfSubprogram * parentSubprogram = inheritedAttribute.parentSubprogram;
-    
-    switch(n->variantT()) {
-        case V_SgAsmDwarfSubprogram: {
-            parentSubprogram = isSgAsmDwarfSubprogram(n);                        
-        };
-        break;
-
-        default: ;
-    }
-
-    if(parentSubprogram != NULL) {
-        depth++;
-    }
-
-    SgAsmDwarfConstruct * dc = isSgAsmDwarfConstruct(n);
-    if(dc != NULL) {
-        for(int i = 0; i < depth; ++i) {
-             std::cout << " ";
-        }
-        std::cout << n->class_name() << "    offset: " << dc->get_offset() << " name: " << dc->get_name();
-        
-        OffsetAttribute * attr = OffsetAttribute::get(dc);
-
-        if(attr != NULL) { 
-            std::cout << " type: " << attr->type->get_name();
-        }
-        std::cout << std::endl;
-    }
-
-    return InheritedAttribute(depth, parentSubprogram);
-
-}
     
 offsetMapType & constructOffsetMap(SgNode * top) {
     offsetMapType * offsetMap = new offsetMapType();
@@ -229,58 +179,6 @@ int main ( int argc, char* argv[] ) {
     std::cout << global->unparseToCompleteString() << std::endl;
 
     delete global;
-
-//    InheritedAttribute inheritedAttribute(0, NULL);
-//    DwarfTraversal traversal;
-//    traversal.traverse(project, inheritedAttribute);
-
-
-//    Rose_STL_Container<SgNode*> interpLists = NodeQuery::querySubTree(project, V_SgAsmInterpretationList);
-//    BOOST_FOREACH(SgNode * l, interpLists) {
-//        SgAsmInterpretationList * interpList = isSgAsmInterpretationList(l);
-//        if(interpList == NULL) {
-//            std::cerr << "ERROR: Couldn't find an interpretation list in AST!" << std::endl;
-//            return -1;
-//        }
-//        const SgAsmInterpretationPtrList & interps = interpList->get_interpretations();
-//        BOOST_FOREACH(SgAsmInterpretation * interp, interps) {
-//            SgAsmDwarfCompilationUnitList * unitList = interp->get_dwarf_info();
-//            ROSE_ASSERT(unitList != NULL);
-//            const SgAsmDwarfCompilationUnitPtrList & units = unitList->get_cu_list();
-//            BOOST_FOREACH(SgAsmDwarfCompilationUnit * unit, units) {
-//                ROSE_ASSERT(unit != NULL);
-//                std::string producer = unit->get_producer();
-//                if(producer.empty()) {
-//                    producer = "<empty>";
-//                }
-//                std::cerr << std::setw(14) << "Producer: "   << std::setw(32) << producer                   << std::endl;
-//                std::cerr << std::setw(14) << "Language: "   << std::setw(32) << unit->get_language()       << std::endl;
-//                std::cerr << std::setw(14) << "Low PC: "     << std::setw(32) << unit->get_low_pc()         << std::endl;
-//                std::cerr << std::setw(14) << "Hi PC: "      << std::setw(32) << unit->get_hi_pc()          << std::endl;
-//                std::cerr << std::setw(14) << "Version: "    << std::setw(32) << unit->get_version_stamp()  << std::endl;
-//                std::cerr << std::setw(14) << "Abb offset: " << std::setw(32) << unit->get_abbrev_offset()  << std::endl;
-//                std::cerr << std::setw(14) << "Addr size: "  << std::setw(32) << unit->get_address_size()   << std::endl;
-//                std::cerr << std::setw(14) << "Offset len: " << std::setw(32) << unit->get_offset_length()  << std::endl;
-//
-//                SgAsmDwarfConstructList * constructList = unit->get_language_constructs();
-//                const SgAsmDwarfConstructPtrList & constructs = constructList->get_list();
-//                BOOST_FOREACH(SgAsmDwarfConstruct * construct, constructs) {
-//                    ROSE_ASSERT(construct != NULL);
-//                    std::string name = construct->get_name();
-//                    if(name.empty()) {
-//                        name = "<empty>";
-//                    }
-//                    std::cerr << std::endl;
-//                    std::cerr << std::setw(14) << "CONSTRUCT: "  << std::setw(32) << construct->class_name() << std::endl;
-//                    std::cerr << std::setw(14) << "Name: "       << std::setw(32) << name   << std::endl;
-//                    std::cerr << std::setw(14) << "Offset: "     << std::setw(32) << construct->get_offset() << std::endl;
-//                    std::cerr << std::setw(14) << "Overall: "    << std::setw(32) << construct->get_overall_offset() << std::endl;
-//                    std::cerr << std::setw(14) << "Nest level: " << std::setw(32) << construct->get_nesting_level() << std::endl;
-//                }
-//            }
-//        }
-//
-//    }
 
     return 0;
 }                                  
