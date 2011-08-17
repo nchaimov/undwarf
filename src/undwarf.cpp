@@ -17,31 +17,10 @@
 
 #include "typeTable.h"
 #include "DwarfROSEConverter.h"
-
-typedef std::map<std::string, SgAsmDwarfConstruct*> offsetMapType;
-TypeTable & typeTable = TypeTable::getInstance();
-
-class OffsetAttribute : public AstAttribute {
-    public:
-        SgAsmDwarfConstruct * type;
-
-        OffsetAttribute(SgAsmDwarfConstruct * t = NULL) : type(t) {};
-        
-        static const std::string OFFSET_ATTRIBUTE;
-
-        static inline OffsetAttribute * get(SgNode * n) {
-           AstAttribute * attr = n->getAttribute(OFFSET_ATTRIBUTE);        
-           return dynamic_cast<OffsetAttribute*>(attr);
-        };
-
-        inline void add(SgNode * n) {
-            n->addNewAttribute(OFFSET_ATTRIBUTE, this);
-        }
-};
-
-const std::string OffsetAttribute::OFFSET_ATTRIBUTE = "OFFSET_ATTRIBUTE";
-
+#include "attributes.h"
     
+static TypeTable & typeTable = TypeTable::getInstance();
+
 offsetMapType & constructOffsetMap(SgNode * top) {
     offsetMapType * offsetMap = new offsetMapType();
 
@@ -111,8 +90,6 @@ std::string typeToName(SgAsmDwarfConstruct * d) {
     return s.str();
 }
 
-
-
 int main ( int argc, char* argv[] ) {
 	
 	// Parses the input files and generates the AST
@@ -125,52 +102,20 @@ int main ( int argc, char* argv[] ) {
     offsetMapType & offsets = constructOffsetMap(project);
     annotateDwarfConstructs(project, offsets);
 
+    SgSourceFile * newFile = new SgSourceFile();
+    newFile->set_parent(project);
+    newFile->set_Cxx_only(true);
     SgGlobal * global = new SgGlobal();
-    SageInterface::setSourcePositionForTransformation(global);
-    global->set_parent(project);
+    newFile->set_globalScope(global);
+    global->set_parent(newFile);
+    SageInterface::setSourcePositionForTransformation(newFile);
+    newFile->set_startOfConstruct(Sg_File_Info::generateDefaultFileInfoForTransformationNode());
 
     Rose_STL_Container<SgNode*> subprograms = NodeQuery::querySubTree(project, V_SgAsmDwarfSubprogram);
     BOOST_FOREACH(SgNode * n, subprograms) {
-        SgAsmDwarfSubprogram * subprogram = isSgAsmDwarfSubprogram(n);
-        const std::string & name = subprogram->get_name();
-        OffsetAttribute * attr = OffsetAttribute::get(subprogram);
-        std::string retType = "";
-        if(attr != NULL) {
-            SgAsmDwarfConstruct * type = attr->type;
-            if(type != NULL) {
-                retType = typeToName(type);
-            } else {
-                std::cerr << "Subprogram " << name << " had no type in its offset attribute." << std::endl;
-            }
-        } else {
-            retType = "void";
-        } 
-        std::vector<std::pair<std::string, std::string> > args;
-        Rose_STL_Container<SgNode*> formalParameters = NodeQuery::querySubTree(subprogram, V_SgAsmDwarfFormalParameter);
-        BOOST_FOREACH(SgNode * n2, formalParameters) {
-            SgAsmDwarfFormalParameter * formalParameter = isSgAsmDwarfFormalParameter(n2);
-            OffsetAttribute * attr = OffsetAttribute::get(formalParameter);
-            if(attr != NULL) {
-                SgAsmDwarfConstruct * type = attr->type;
-                if(type != NULL) {
-                    args.push_back(std::pair<std::string, std::string>( formalParameter->get_name(), typeToName(type) ));
-                } else {
-                    std::cerr << "Formal parameter " << formalParameter->get_name() << " had no type in its offset attribute." << std::endl;
-                }
-            } else {
-                std::cerr << "Formal parameter " << formalParameter->get_name() << " had no attached offset attribute." << std::endl;
-            }
-        }
-
-        std::cout << retType << " " << name;
-        std::cout << "(";
-        for(size_t i = 0; i < args.size(); ++i) {
-            std::cout << (args[i].second) << " " << (args[i].first);
-            if(i != args.size() - 1) {
-                std::cout << ", ";
-            }
-        }
-        std::cout << ")" << std::endl;
+       SgFunctionDeclaration * decl = DwarfROSE::convertSubprogram(isSgAsmDwarfSubprogram(n));
+       SageInterface::fixStatement(decl, global);
+       SageInterface::insertStatementAfterLastDeclaration(decl, global);
     }
 
     

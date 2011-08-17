@@ -52,8 +52,11 @@ undwarf.o: $(ROSE_SOURCE_DIR)/undwarf.cpp $(ROSE_SOURCE_DIR)/typeTable.h
 typeTable.o: $(ROSE_SOURCE_DIR)/typeTable.cpp $(ROSE_SOURCE_DIR)/typeTable.h
 	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ -c $(ROSE_SOURCE_DIR)/typeTable.cpp  
 
-DwarfROSEConverter.o: $(ROSE_SOURCE_DIR)/DwarfROSEConverter.cpp $(ROSE_SOURCE_DIR)/DwarfROSEConverter.h
+DwarfROSEConverter.o: $(ROSE_SOURCE_DIR)/DwarfROSEConverter.cpp $(ROSE_SOURCE_DIR)/DwarfROSEConverter.h $(ROSE_SOURCE_DIR)/attributes.h
 	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ -c $(ROSE_SOURCE_DIR)/DwarfROSEConverter.cpp  
 
-undwarf: undwarf.o typeTable.o DwarfROSEConverter.o
+attributes.o: $(ROSE_SOURCE_DIR)/attributes.cpp $(ROSE_SOURCE_DIR)/attributes.h
+	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ -c $(ROSE_SOURCE_DIR)/attributes.cpp  
+
+undwarf: undwarf.o typeTable.o DwarfROSEConverter.o attributes.o
 	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ $+ $(LIBS_WITH_RPATH) -L$(ROSE_LIB_DIR) $(LDFLAGS) 

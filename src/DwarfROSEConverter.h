@@ -1,6 +1,14 @@
+#ifndef __DWARF_ROSE_CONVERTER_H__
+#define __DWARF_ROSE_CONVERTER_H__
+
 #include "rose.h"
-#include "typeTable.h"
+
+class OffsetAttribute;
 
 namespace DwarfROSE {
-    SgType * dwarfTypeToSgType(SgAsmDwarfConstruct * c);    
+    SgType * typeFromAttribute(OffsetAttribute * a);
+    SgType * convertType(SgAsmDwarfConstruct * c);    
+    SgFunctionDeclaration * convertSubprogram(SgAsmDwarfSubprogram * s);
 }
+
+#endif
