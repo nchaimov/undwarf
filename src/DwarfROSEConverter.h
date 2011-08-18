@@ -9,6 +9,8 @@ namespace DwarfROSE {
     SgType * typeFromAttribute(OffsetAttribute * a);
     SgType * convertType(SgAsmDwarfConstruct * c);    
     SgFunctionDeclaration * convertSubprogram(SgAsmDwarfSubprogram * s);
+    SgEnumDeclaration * convertEnum(SgAsmDwarfEnumerationType * e);
+    SgTypedefDeclaration * convertTypedef(SgAsmDwarfTypedef * t, SgScopeStatement * s);
 }
 
 #endif

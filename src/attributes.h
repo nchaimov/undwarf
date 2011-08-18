@@ -7,8 +7,10 @@
 class OffsetAttribute : public AstAttribute {
     public:
         SgAsmDwarfConstruct * type;
+        SgNode * node;
 
-        OffsetAttribute(SgAsmDwarfConstruct * t = NULL) : type(t) {};
+        OffsetAttribute(SgAsmDwarfConstruct * t = NULL,
+                SgNode * n = NULL) : type(t), node(n) {};
         
         static const std::string OFFSET_ATTRIBUTE;
 
@@ -23,5 +25,13 @@ class OffsetAttribute : public AstAttribute {
 };
 
 typedef std::map<std::string, SgAsmDwarfConstruct*> offsetMapType;
+
+class InheritedAttribute {
+    public:
+        SgNode * parentSubprogram;
+
+        InheritedAttribute(SgNode * p = NULL) : parentSubprogram(p) {};
+};                                                                     
+
 
 #endif

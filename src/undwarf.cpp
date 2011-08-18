@@ -48,9 +48,10 @@ void annotateDwarfConstructs(SgNode * top, offsetMapType & map) {
     Rose_STL_Container<SgNode*> constructs = NodeQuery::querySubTree(top, V_SgAsmDwarfConstruct);
     BOOST_FOREACH(SgNode * n, constructs) {
         SgAsmDwarfConstruct * construct = isSgAsmDwarfConstruct(n);
+        OffsetAttribute * attr = new OffsetAttribute();
+        attr->add(construct);
         if(map.count(construct->get_type_ref()) > 0) {
-            OffsetAttribute * attr = new OffsetAttribute(map[construct->get_type_ref()]);
-            attr->add(construct);
+            attr->type = map[construct->get_type_ref()];
         }
 #ifdef DEBUG
         else {
@@ -90,6 +91,76 @@ std::string typeToName(SgAsmDwarfConstruct * d) {
     return s.str();
 }
 
+SgSourceFile * newFileInProject(SgProject * project) {
+    SgSourceFile * newFile = new SgSourceFile();
+    newFile->set_parent(project);
+    newFile->set_Cxx_only(true);
+    SgGlobal * global = new SgGlobal();
+    newFile->set_globalScope(global);
+    global->set_parent(newFile);
+    SageInterface::setSourcePositionForTransformation(newFile);
+    newFile->set_startOfConstruct(Sg_File_Info::generateDefaultFileInfoForTransformationNode());
+    newFile->get_startOfConstruct()->set_parent(newFile);
+    return newFile;
+}
+
+class UndwarfTraversal : public AstTopDownProcessing<InheritedAttribute> {
+    private:
+        SgGlobal * global;
+
+    public:
+        virtual InheritedAttribute evaluateInheritedAttribute(SgNode * n, InheritedAttribute a);
+        UndwarfTraversal(SgGlobal * g) : global(g) {};
+
+};
+
+void fixEnumDeclaration(SgEnumDeclaration * e, SgScopeStatement * scope) {
+    SgInitializedNamePtrList & initNames = e->get_enumerators();
+    BOOST_FOREACH(SgInitializedName * initName, initNames) {
+        initName->set_scope(scope);
+    }
+    e->set_parent(scope);
+    e->set_scope(scope);
+}
+
+InheritedAttribute UndwarfTraversal::evaluateInheritedAttribute(SgNode * n, InheritedAttribute a) {
+    SgNode * parentSubprogram = a.parentSubprogram;
+
+    SgDeclarationStatement * newDecl = NULL;
+    SgScopeStatement * scope = global;
+
+    switch(n->variantT()) {
+        case V_SgAsmDwarfEnumerationType: {
+            SgEnumDeclaration * enumDecl = DwarfROSE::convertEnum(isSgAsmDwarfEnumerationType(n));
+            fixEnumDeclaration(enumDecl, scope);
+            newDecl = enumDecl;
+            break;
+        };
+
+        case V_SgAsmDwarfSubprogram: {
+            SgFunctionDeclaration * funcDecl = DwarfROSE::convertSubprogram(isSgAsmDwarfSubprogram(n));
+            parentSubprogram = n;
+            newDecl = funcDecl;
+            break;
+        };
+
+        case V_SgAsmDwarfTypedef: {
+            SgTypedefDeclaration * typedefDecl = DwarfROSE::convertTypedef(isSgAsmDwarfTypedef(n), scope);
+            newDecl = typedefDecl;
+            break;
+        };
+
+        default: ; // Do nothing
+    }
+
+    if(newDecl != NULL)  {
+        SageInterface::fixStatement(newDecl, scope);
+        SageInterface::insertStatementAfterLastDeclaration(newDecl, scope);
+    }
+
+    return InheritedAttribute(parentSubprogram);
+}
+
 int main ( int argc, char* argv[] ) {
 	
 	// Parses the input files and generates the AST
@@ -102,24 +173,16 @@ int main ( int argc, char* argv[] ) {
     offsetMapType & offsets = constructOffsetMap(project);
     annotateDwarfConstructs(project, offsets);
 
-    SgSourceFile * newFile = new SgSourceFile();
-    newFile->set_parent(project);
-    newFile->set_Cxx_only(true);
-    SgGlobal * global = new SgGlobal();
-    newFile->set_globalScope(global);
-    global->set_parent(newFile);
-    SageInterface::setSourcePositionForTransformation(newFile);
-    newFile->set_startOfConstruct(Sg_File_Info::generateDefaultFileInfoForTransformationNode());
+    SgSourceFile * newFile = newFileInProject(project);
+    SgGlobal * global = newFile->get_globalScope();
 
-    Rose_STL_Container<SgNode*> subprograms = NodeQuery::querySubTree(project, V_SgAsmDwarfSubprogram);
-    BOOST_FOREACH(SgNode * n, subprograms) {
-       SgFunctionDeclaration * decl = DwarfROSE::convertSubprogram(isSgAsmDwarfSubprogram(n));
-       SageInterface::fixStatement(decl, global);
-       SageInterface::insertStatementAfterLastDeclaration(decl, global);
+    InheritedAttribute attr(NULL);
+    UndwarfTraversal traversal(global);
+
+    Rose_STL_Container<SgNode*> interps = NodeQuery::querySubTree(project, V_SgAsmInterpretationList);
+    BOOST_FOREACH(SgNode * n, interps) {
+        traversal.traverse(n, attr);
     }
-
-    
-    AstTests::runAllTests(project);
 
     std::cout << global->unparseToCompleteString() << std::endl;
 
