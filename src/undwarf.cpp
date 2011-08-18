@@ -61,36 +61,6 @@ void annotateDwarfConstructs(SgNode * top, offsetMapType & map) {
     }
 }
 
-std::string typeToName(SgAsmDwarfConstruct * d) {
-    std::stringstream s;
-
-    switch(d->variantT()) {
-        case V_SgAsmDwarfBaseType: {
-            s << d->get_name();                           
-        };
-        break;
-
-        case V_SgAsmDwarfPointerType: {
-            OffsetAttribute * attr = OffsetAttribute::get(d);
-            if(attr != NULL) {
-                SgAsmDwarfConstruct * type = attr->type;
-                if(type != NULL) { 
-                    s << typeToName(type) << "*";
-                } else {
-                    std::cerr << "Pointer type " << d->get_name() << " had no type in its offset attribute." << std::endl;
-                }
-            } else {
-                std::cerr << "Pointer type " << d->get_name() << " had no attached offset attribute." << std::endl;
-            }
-        };
-        break;
-    
-        default:
-            std::cerr << "Unhandled type " << d->class_name() << std::endl;
-    }
-    return s.str();
-}
-
 SgSourceFile * newFileInProject(SgProject * project) {
     SgSourceFile * newFile = new SgSourceFile();
     newFile->set_parent(project);

@@ -71,6 +71,7 @@ SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c) {
             SgEnumDeclaration * enumDecl = isSgEnumDeclaration(attr->node);
             if(enumDecl == NULL) {
                 std::cerr << "ERROR: Enumeration type had no associated enumeration declaration." << std::endl;
+                std::cerr << "Node was: " << c->class_name() << " " << c << " " << c->get_name() << std::endl;
             } else {
                 return buildEnumType(enumDecl);
             }
@@ -83,6 +84,7 @@ SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c) {
             SgTypedefDeclaration * decl = isSgTypedefDeclaration(attr->node);
             if(decl == NULL) {
                 std::cerr << "ERROR: Typedef had no associated typedef declaration." << std::endl;
+                std::cerr << "Node was: " << c->class_name() << " " << c << " " << c->get_name() << std::endl;
             } else {
                 return buildTypedefType(decl);
             }
@@ -111,6 +113,7 @@ SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c) {
             SgClassDeclaration * decl = isSgClassDeclaration(attr->node);
             if(decl == NULL) {
                 std::cerr << "ERROR: Class/struct/union had no associated declaration." << std::endl;
+                std::cerr << "Node was: " << c->class_name() << " " << c << " " << c->get_name() << std::endl;
             } else {
                 return buildClassType(decl);
             }
