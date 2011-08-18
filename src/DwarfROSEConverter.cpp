@@ -59,6 +59,7 @@ SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c) {
             }
         };
 
+        // TYPEDEFS
         case V_SgAsmDwarfTypedef: {
             OffsetAttribute * attr = OffsetAttribute::get(c);
             ROSE_ASSERT(attr != NULL);
@@ -68,6 +69,22 @@ SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c) {
             } else {
                 return buildTypedefType(decl);
             }
+        };
+        
+        // CONST
+        case V_SgAsmDwarfConstType: {
+            OffsetAttribute * attr = OffsetAttribute::get(c);
+            ROSE_ASSERT(attr != NULL);
+            SgType * baseType = typeFromAttribute(attr);
+            return SageBuilder::buildConstType(baseType);
+        };
+
+        // VOLATILE
+        case V_SgAsmDwarfVolatileType: {
+            OffsetAttribute * attr = OffsetAttribute::get(c);
+            ROSE_ASSERT(attr != NULL);
+            SgType * baseType = typeFromAttribute(attr);
+            return SageBuilder::buildVolatileType(baseType);
         };
         
 
@@ -143,7 +160,6 @@ SgTypedefDeclaration * DwarfROSE::convertTypedef(SgAsmDwarfTypedef * t, SgScopeS
     std::string name = t->get_name();
     // ROSE insists that this have a scope when built; I don't know why.
     SgTypedefDeclaration * decl = SageBuilder::buildTypedefDeclaration(SgName(name), baseType, s);
-    std::cerr << "Built a typedef: " << decl << std::endl;
     attr->node = decl;
     return decl;
 }
