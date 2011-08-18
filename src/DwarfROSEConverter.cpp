@@ -4,6 +4,9 @@
 #include "typeTable.h"
 #include "attributes.h"
 #include <boost/foreach.hpp>
+#include <boost/lexical_cast.hpp>
+
+size_t DwarfROSE::unnamed_count = 0;
 
 SgType * DwarfROSE::typeFromAttribute(OffsetAttribute * attr) {
     if(attr == NULL) {
@@ -23,6 +26,20 @@ SgTypedefType * buildTypedefType(SgTypedefDeclaration * d) {
     SgTypedefType * type = new SgTypedefType();
     type->set_declaration(d);
     return type;
+}
+
+SgClassType * buildClassType(SgClassDeclaration * d) {
+    SgClassType * type = new SgClassType();
+    type->set_declaration(d);
+    return type;
+}
+
+SgClassDeclaration * buildUnionDeclaration(const SgName & name, SgScopeStatement * scope = NULL) {
+    SgClassDeclaration* defdecl = SageBuilder::buildClassDeclaration_nfi(name,SgClassDeclaration::e_union,scope,NULL);
+    SageInterface::setOneSourcePositionForTransformation(defdecl);
+    ROSE_ASSERT(defdecl->get_firstNondefiningDeclaration() != NULL);
+    SageInterface::setOneSourcePositionForTransformation(defdecl->get_firstNondefiningDeclaration());
+    return defdecl; 
 }
 
 SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c) {
@@ -85,6 +102,18 @@ SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c) {
             ROSE_ASSERT(attr != NULL);
             SgType * baseType = typeFromAttribute(attr);
             return SageBuilder::buildVolatileType(baseType);
+        };
+
+        // STRUCTS
+        case V_SgAsmDwarfStructureType: {
+            OffsetAttribute * attr = OffsetAttribute::get(c);
+            ROSE_ASSERT(attr != NULL);
+            SgClassDeclaration * decl = isSgClassDeclaration(attr->node);
+            if(decl == NULL) {
+                std::cerr << "ERROR: Class/struct/union had no associated declaration." << std::endl;
+            } else {
+                return buildClassType(decl);
+            }
         };
         
 
@@ -156,10 +185,60 @@ SgTypedefDeclaration * DwarfROSE::convertTypedef(SgAsmDwarfTypedef * t, SgScopeS
         return NULL;
     }               
     OffsetAttribute * attr = OffsetAttribute::get(t);
+    ROSE_ASSERT(attr != NULL);
     SgType * baseType = typeFromAttribute(attr);
     std::string name = t->get_name();
     // ROSE insists that this have a scope when built; I don't know why.
     SgTypedefDeclaration * decl = SageBuilder::buildTypedefDeclaration(SgName(name), baseType, s);
     attr->node = decl;
     return decl;
+}
+
+SgClassDeclaration * DwarfROSE::convertStruct(SgAsmDwarfStructureType * s) {
+    if(s == NULL) {
+        return NULL;
+    }
+
+    OffsetAttribute * attr = OffsetAttribute::get(s);
+    ROSE_ASSERT(attr != NULL);
+    std::string name = s->get_name();
+    if(name.empty()) {
+        name = "_UNNAMED_STRUCT_" + boost::lexical_cast<std::string>(unnamed_count++) + "_";
+    }
+    SgClassDeclaration * decl = SageBuilder::buildStructDeclaration(SgName(name));
+    ROSE_ASSERT(decl != NULL);
+    attr->node = decl;
+    return decl;
+}
+
+SgClassDeclaration * DwarfROSE::convertUnion(SgAsmDwarfUnionType * s) {
+    if(s == NULL) {
+        return NULL;
+    }
+
+    OffsetAttribute * attr = OffsetAttribute::get(s);
+    ROSE_ASSERT(attr != NULL);
+    std::string name = s->get_name();
+    if(name.empty()) {
+        name = "_UNNAMED_UNION_" + boost::lexical_cast<std::string>(unnamed_count++) + "_";
+    }
+    SgClassDeclaration * decl = buildUnionDeclaration(SgName(name));
+    ROSE_ASSERT(decl != NULL);
+    attr->node = decl;
+    return decl;
+}
+
+SgVariableDeclaration * DwarfROSE::convertMember(SgAsmDwarfMember * m) {
+    if(m == NULL) {
+        return NULL;
+    }
+
+    OffsetAttribute * attr = OffsetAttribute::get(m);
+    ROSE_ASSERT(attr != NULL);
+    std::string name = m->get_name();
+    SgType * type = typeFromAttribute(attr);
+    SgVariableDeclaration * decl = SageBuilder::buildVariableDeclaration(SgName(name), type);
+    attr->node = decl;
+    return decl;
+
 }

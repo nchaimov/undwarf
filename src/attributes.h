@@ -28,9 +28,9 @@ typedef std::map<std::string, SgAsmDwarfConstruct*> offsetMapType;
 
 class InheritedAttribute {
     public:
-        SgNode * parentSubprogram;
+        SgScopeStatement * parentScope;
 
-        InheritedAttribute(SgNode * p = NULL) : parentSubprogram(p) {};
+        InheritedAttribute(SgScopeStatement * p = NULL) : parentScope(p) {};
 };                                                                     
 
 

@@ -124,10 +124,10 @@ void fixEnumDeclaration(SgEnumDeclaration * e, SgScopeStatement * scope) {
 }
 
 InheritedAttribute UndwarfTraversal::evaluateInheritedAttribute(SgNode * n, InheritedAttribute a) {
-    SgNode * parentSubprogram = a.parentSubprogram;
+    SgScopeStatement * parentScope = a.parentScope;
 
     SgDeclarationStatement * newDecl = NULL;
-    SgScopeStatement * scope = global;
+    SgScopeStatement * scope = (parentScope == NULL) ? global : parentScope;
 
     switch(n->variantT()) {
         case V_SgAsmDwarfEnumerationType: {
@@ -139,7 +139,7 @@ InheritedAttribute UndwarfTraversal::evaluateInheritedAttribute(SgNode * n, Inhe
 
         case V_SgAsmDwarfSubprogram: {
             SgFunctionDeclaration * funcDecl = DwarfROSE::convertSubprogram(isSgAsmDwarfSubprogram(n));
-            parentSubprogram = n;
+            //parentScope = funcDecl;
             newDecl = funcDecl;
             break;
         };
@@ -150,6 +150,27 @@ InheritedAttribute UndwarfTraversal::evaluateInheritedAttribute(SgNode * n, Inhe
             break;
         };
 
+        case V_SgAsmDwarfStructureType: {
+            SgClassDeclaration * structDecl = DwarfROSE::convertStruct(isSgAsmDwarfStructureType(n));
+            parentScope = structDecl->get_definition();
+            newDecl = structDecl;
+            break;
+        };
+
+        case V_SgAsmDwarfUnionType: {
+            SgClassDeclaration * unionDecl = DwarfROSE::convertUnion(isSgAsmDwarfUnionType(n));
+            parentScope = unionDecl->get_definition();
+            newDecl = unionDecl;
+            break;
+        };
+
+        case V_SgAsmDwarfMember: {
+            SgVariableDeclaration * varDecl = DwarfROSE::convertMember(isSgAsmDwarfMember(n));
+            newDecl = varDecl;
+            break;
+        };
+
+
         default: ; // Do nothing
     }
 
@@ -158,7 +179,7 @@ InheritedAttribute UndwarfTraversal::evaluateInheritedAttribute(SgNode * n, Inhe
         SageInterface::insertStatementAfterLastDeclaration(newDecl, scope);
     }
 
-    return InheritedAttribute(parentSubprogram);
+    return InheritedAttribute(parentScope);
 }
 
 int main ( int argc, char* argv[] ) {
