@@ -9,14 +9,14 @@ namespace DwarfROSE {
 
     extern size_t unnamed_count;
 
-    SgType * typeFromAttribute(OffsetAttribute * a);
-    SgType * convertType(SgAsmDwarfConstruct * c);    
-    SgFunctionDeclaration * convertSubprogram(SgAsmDwarfSubprogram * s);
-    SgEnumDeclaration * convertEnum(SgAsmDwarfEnumerationType * e);
+    SgType * typeFromAttribute(OffsetAttribute * a, SgScopeStatement * s);
+    SgType * convertType(SgAsmDwarfConstruct * c, SgScopeStatement * s);    
+    SgFunctionDeclaration * convertSubprogram(SgAsmDwarfSubprogram * p, SgScopeStatement * s);
+    SgEnumDeclaration * convertEnum(SgAsmDwarfEnumerationType * e, SgScopeStatement * s);
     SgTypedefDeclaration * convertTypedef(SgAsmDwarfTypedef * t, SgScopeStatement * s);
-    SgClassDeclaration * convertStruct(SgAsmDwarfStructureType * s);
-    SgClassDeclaration * convertUnion(SgAsmDwarfUnionType * s);
-    SgVariableDeclaration * convertMember(SgAsmDwarfMember * m);
+    SgClassDeclaration * convertStruct(SgAsmDwarfStructureType * t, SgScopeStatement * s);
+    SgClassDeclaration * convertUnion(SgAsmDwarfUnionType * t, SgScopeStatement * s);
+    SgVariableDeclaration * convertMember(SgAsmDwarfMember * m, SgScopeStatement * s);
 }
 
 #endif

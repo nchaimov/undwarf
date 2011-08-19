@@ -8,11 +8,11 @@
 
 size_t DwarfROSE::unnamed_count = 0;
 
-SgType * DwarfROSE::typeFromAttribute(OffsetAttribute * attr) {
+SgType * DwarfROSE::typeFromAttribute(OffsetAttribute * attr, SgScopeStatement * scope) {
     if(attr == NULL) {
         return SageBuilder::buildVoidType();
     } else {
-        return DwarfROSE::convertType(attr->type);
+        return DwarfROSE::convertType(attr->type, scope);
     }
 }
 
@@ -42,7 +42,7 @@ SgClassDeclaration * buildUnionDeclaration(const SgName & name, SgScopeStatement
     return defdecl; 
 }
 
-SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c) {
+SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c, SgScopeStatement * scope) {
     if(c == NULL) {
         return SageBuilder::buildVoidType();
     }
@@ -59,7 +59,7 @@ SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c) {
             if(attr == NULL) {
                 pointedTo = SageBuilder::buildVoidType();
             } else {
-                pointedTo = convertType(attr->type);
+                pointedTo = convertType(attr->type, scope);
             }
             return SageBuilder::buildPointerType(pointedTo);
         };
@@ -94,7 +94,7 @@ SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c) {
         case V_SgAsmDwarfConstType: {
             OffsetAttribute * attr = OffsetAttribute::get(c);
             ROSE_ASSERT(attr != NULL);
-            SgType * baseType = typeFromAttribute(attr);
+            SgType * baseType = typeFromAttribute(attr, scope);
             return SageBuilder::buildConstType(baseType);
         };
 
@@ -102,7 +102,7 @@ SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c) {
         case V_SgAsmDwarfVolatileType: {
             OffsetAttribute * attr = OffsetAttribute::get(c);
             ROSE_ASSERT(attr != NULL);
-            SgType * baseType = typeFromAttribute(attr);
+            SgType * baseType = typeFromAttribute(attr, scope);
             return SageBuilder::buildVolatileType(baseType);
         };
 
@@ -112,11 +112,41 @@ SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c) {
             ROSE_ASSERT(attr != NULL);
             SgClassDeclaration * decl = isSgClassDeclaration(attr->node);
             if(decl == NULL) {
-                std::cerr << "ERROR: Class/struct/union had no associated declaration." << std::endl;
+#ifdef DEBUG
+                std::cerr << "Class/struct/union had no associated declaration." << std::endl;
                 std::cerr << "Node was: " << c->class_name() << " " << c << " " << c->get_name() << std::endl;
+                std::cerr << "Will build forward declaration." << std::endl;
+#endif
+                SgStatement * parent = isSgStatement(scope->get_parent());
+                SgScopeStatement * parentScope = parent == NULL ? scope : SageInterface::getScope(parent);
+                SgClassDeclaration * forwardDecl = SageBuilder::buildNondefiningClassDeclaration_nfi(SgName(c->get_name()),
+                        SgClassDeclaration::e_struct, parentScope);
+                SageInterface::setOneSourcePositionForTransformation(forwardDecl);
+                forwardDecl->set_forward(true);
+                SageInterface::fixStatement(forwardDecl, parentScope);
+                if(parent == NULL) {
+                    SageInterface::prependStatement(forwardDecl, parentScope);
+                } else {
+                    SageInterface::insertStatementBefore(parent, forwardDecl, parentScope);
+                }
+                return buildClassType(forwardDecl);
             } else {
                 return buildClassType(decl);
             }
+        };
+
+        case V_SgAsmDwarfArrayType: {
+            SgAsmDwarfArrayType * arrayType = isSgAsmDwarfArrayType(c);
+            OffsetAttribute * attr = OffsetAttribute::get(c);
+            ROSE_ASSERT(attr != NULL);
+            SgType * baseType = typeFromAttribute(attr, scope);
+            Rose_STL_Container<SgNode*> subranges = NodeQuery::querySubTree(arrayType, V_SgAsmDwarfSubrangeType);
+            SgAsmDwarfSubrangeType * subrange = isSgAsmDwarfSubrangeType(subranges[0]);
+            ROSE_ASSERT(subrange != NULL);
+            uint64_t upper = subrange->get_upper_bound();
+            SgExpression * sizeExpr = SageBuilder::buildUnsignedLongLongIntVal(upper);
+            ROSE_ASSERT(sizeExpr != NULL);
+            return SageBuilder::buildArrayType(baseType, sizeExpr); 
         };
         
 
@@ -136,14 +166,14 @@ SgFunctionParameterList * buildEmptyParameterList() {
     return parameterList;
 }
 
-SgFunctionDeclaration * DwarfROSE::convertSubprogram(SgAsmDwarfSubprogram * s) {
+SgFunctionDeclaration * DwarfROSE::convertSubprogram(SgAsmDwarfSubprogram * s, SgScopeStatement * scope) {
     if(s == NULL) {
         return NULL;
     }
     
     std::string name = s->get_name();
     OffsetAttribute * attr = OffsetAttribute::get(s);
-    SgType * retType = typeFromAttribute(attr);
+    SgType * retType = typeFromAttribute(attr, scope);
 
     SgFunctionParameterList * paramList = buildEmptyParameterList();
 
@@ -152,7 +182,7 @@ SgFunctionDeclaration * DwarfROSE::convertSubprogram(SgAsmDwarfSubprogram * s) {
         SgAsmDwarfFormalParameter * formalParam = isSgAsmDwarfFormalParameter(n);
         std::string paramName = formalParam->get_name();
         OffsetAttribute * paramAttr = OffsetAttribute::get(formalParam);
-        SgType * paramType = typeFromAttribute(paramAttr);
+        SgType * paramType = typeFromAttribute(paramAttr, scope);
         SgInitializedName * initName = SageBuilder::buildInitializedName(paramName, paramType);
         SageInterface::appendArg(paramList, initName);
     }
@@ -162,7 +192,7 @@ SgFunctionDeclaration * DwarfROSE::convertSubprogram(SgAsmDwarfSubprogram * s) {
     return decl;
 }
 
-SgEnumDeclaration * DwarfROSE::convertEnum(SgAsmDwarfEnumerationType * e) {
+SgEnumDeclaration * DwarfROSE::convertEnum(SgAsmDwarfEnumerationType * e, SgScopeStatement * scope) {
     if(e == NULL) {
         return NULL;
     }
@@ -183,21 +213,21 @@ SgEnumDeclaration * DwarfROSE::convertEnum(SgAsmDwarfEnumerationType * e) {
     return decl;
 }
 
-SgTypedefDeclaration * DwarfROSE::convertTypedef(SgAsmDwarfTypedef * t, SgScopeStatement * s) {
+SgTypedefDeclaration * DwarfROSE::convertTypedef(SgAsmDwarfTypedef * t, SgScopeStatement * scope) {
     if(t == NULL) {
         return NULL;
     }               
     OffsetAttribute * attr = OffsetAttribute::get(t);
     ROSE_ASSERT(attr != NULL);
-    SgType * baseType = typeFromAttribute(attr);
+    SgType * baseType = typeFromAttribute(attr, scope);
     std::string name = t->get_name();
     // ROSE insists that this have a scope when built; I don't know why.
-    SgTypedefDeclaration * decl = SageBuilder::buildTypedefDeclaration(SgName(name), baseType, s);
+    SgTypedefDeclaration * decl = SageBuilder::buildTypedefDeclaration(SgName(name), baseType, scope);
     attr->node = decl;
     return decl;
 }
 
-SgClassDeclaration * DwarfROSE::convertStruct(SgAsmDwarfStructureType * s) {
+SgClassDeclaration * DwarfROSE::convertStruct(SgAsmDwarfStructureType * s, SgScopeStatement * scope) {
     if(s == NULL) {
         return NULL;
     }
@@ -214,7 +244,7 @@ SgClassDeclaration * DwarfROSE::convertStruct(SgAsmDwarfStructureType * s) {
     return decl;
 }
 
-SgClassDeclaration * DwarfROSE::convertUnion(SgAsmDwarfUnionType * s) {
+SgClassDeclaration * DwarfROSE::convertUnion(SgAsmDwarfUnionType * s, SgScopeStatement * scope) {
     if(s == NULL) {
         return NULL;
     }
@@ -231,7 +261,7 @@ SgClassDeclaration * DwarfROSE::convertUnion(SgAsmDwarfUnionType * s) {
     return decl;
 }
 
-SgVariableDeclaration * DwarfROSE::convertMember(SgAsmDwarfMember * m) {
+SgVariableDeclaration * DwarfROSE::convertMember(SgAsmDwarfMember * m, SgScopeStatement * scope) {
     if(m == NULL) {
         return NULL;
     }
@@ -239,7 +269,7 @@ SgVariableDeclaration * DwarfROSE::convertMember(SgAsmDwarfMember * m) {
     OffsetAttribute * attr = OffsetAttribute::get(m);
     ROSE_ASSERT(attr != NULL);
     std::string name = m->get_name();
-    SgType * type = typeFromAttribute(attr);
+    SgType * type = typeFromAttribute(attr, scope);
     SgVariableDeclaration * decl = SageBuilder::buildVariableDeclaration(SgName(name), type);
     attr->node = decl;
     return decl;

@@ -99,16 +99,23 @@ InheritedAttribute UndwarfTraversal::evaluateInheritedAttribute(SgNode * n, Inhe
     SgDeclarationStatement * newDecl = NULL;
     SgScopeStatement * scope = (parentScope == NULL) ? global : parentScope;
 
+#ifdef DEBUG
+    if(isSgAsmDwarfConstruct(n)) {
+        SgAsmDwarfConstruct * dc = isSgAsmDwarfConstruct(n);
+        std::cerr << "Processing " << dc->class_name() << " " << dc << " " << dc->get_name() << std::endl; 
+    }
+#endif
+                             
     switch(n->variantT()) {
         case V_SgAsmDwarfEnumerationType: {
-            SgEnumDeclaration * enumDecl = DwarfROSE::convertEnum(isSgAsmDwarfEnumerationType(n));
+            SgEnumDeclaration * enumDecl = DwarfROSE::convertEnum(isSgAsmDwarfEnumerationType(n), scope);
             fixEnumDeclaration(enumDecl, scope);
             newDecl = enumDecl;
             break;
         };
 
         case V_SgAsmDwarfSubprogram: {
-            SgFunctionDeclaration * funcDecl = DwarfROSE::convertSubprogram(isSgAsmDwarfSubprogram(n));
+            SgFunctionDeclaration * funcDecl = DwarfROSE::convertSubprogram(isSgAsmDwarfSubprogram(n), scope);
             //parentScope = funcDecl;
             newDecl = funcDecl;
             break;
@@ -121,21 +128,21 @@ InheritedAttribute UndwarfTraversal::evaluateInheritedAttribute(SgNode * n, Inhe
         };
 
         case V_SgAsmDwarfStructureType: {
-            SgClassDeclaration * structDecl = DwarfROSE::convertStruct(isSgAsmDwarfStructureType(n));
+            SgClassDeclaration * structDecl = DwarfROSE::convertStruct(isSgAsmDwarfStructureType(n), scope);
             parentScope = structDecl->get_definition();
             newDecl = structDecl;
             break;
         };
 
         case V_SgAsmDwarfUnionType: {
-            SgClassDeclaration * unionDecl = DwarfROSE::convertUnion(isSgAsmDwarfUnionType(n));
+            SgClassDeclaration * unionDecl = DwarfROSE::convertUnion(isSgAsmDwarfUnionType(n), scope);
             parentScope = unionDecl->get_definition();
             newDecl = unionDecl;
             break;
         };
 
         case V_SgAsmDwarfMember: {
-            SgVariableDeclaration * varDecl = DwarfROSE::convertMember(isSgAsmDwarfMember(n));
+            SgVariableDeclaration * varDecl = DwarfROSE::convertMember(isSgAsmDwarfMember(n), scope);
             newDecl = varDecl;
             break;
         };
