@@ -62,5 +62,8 @@ DwarfROSEConverter.o: $(ROSE_SOURCE_DIR)/DwarfROSEConverter.cpp $(ROSE_SOURCE_DI
 attributes.o: $(ROSE_SOURCE_DIR)/attributes.cpp $(ROSE_SOURCE_DIR)/attributes.h
 	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ -c $(ROSE_SOURCE_DIR)/attributes.cpp  
 
-undwarf: undwarf.o typeTable.o DwarfROSEConverter.o attributes.o dlstubs.o
+sageUtils.o: $(ROSE_SOURCE_DIR)/sageUtils.cpp $(ROSE_SOURCE_DIR)/sageUtils.h
+	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ -c $(ROSE_SOURCE_DIR)/sageUtils.cpp  
+
+undwarf: undwarf.o typeTable.o DwarfROSEConverter.o attributes.o dlstubs.o sageUtils.o
 	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ $+ $(LIBS_WITH_RPATH) -L$(ROSE_LIB_DIR) $(LDFLAGS) 

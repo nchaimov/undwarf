@@ -33,9 +33,9 @@ offsetMapType & constructOffsetMap(SgNode * top) {
         if(name.empty()) {
             name = "<unnamed>";
         }
-#ifdef DEBUG
-        std::cerr << construct->class_name() << " " << name << " is " << offsetStr << std::endl;
-#endif
+        if(SageInterface::getProject()->get_verbose() > 0) {
+            std::cerr << construct->class_name() << " " << name << " is " << offsetStr << std::endl;
+        }
         (*offsetMap)[offsetStr] = construct;
     }          
 
@@ -53,11 +53,9 @@ void annotateDwarfConstructs(SgNode * top, offsetMapType & map) {
         if(map.count(construct->get_type_ref()) > 0) {
             attr->type = map[construct->get_type_ref()];
         }
-#ifdef DEBUG
-        else {
+        else if(SageInterface::getProject()->get_verbose() > 0 ) {
             std::cerr << "Skipping annotation of " << construct->class_name() << " \"" <<  construct->get_name() << "\" because it has no entry in the offset map." << std::endl;
         } 
-#endif
     }
 }
 
@@ -99,12 +97,10 @@ InheritedAttribute UndwarfTraversal::evaluateInheritedAttribute(SgNode * n, Inhe
     SgDeclarationStatement * newDecl = NULL;
     SgScopeStatement * scope = (parentScope == NULL) ? global : parentScope;
 
-#ifdef DEBUG
-    if(isSgAsmDwarfConstruct(n)) {
+    if(SageInterface::getProject()->get_verbose() > 0 && isSgAsmDwarfConstruct(n)) {
         SgAsmDwarfConstruct * dc = isSgAsmDwarfConstruct(n);
         std::cerr << "Processing " << dc->class_name() << " " << dc << " " << dc->get_name() << std::endl; 
     }
-#endif
                              
     switch(n->variantT()) {
         case V_SgAsmDwarfEnumerationType: {
@@ -168,23 +164,27 @@ int main ( int argc, char* argv[] ) {
     // Make sure we have a valid AST 
     AstTests::runAllTests(project);
 
-    offsetMapType & offsets = constructOffsetMap(project);
-    annotateDwarfConstructs(project, offsets);
+    Rose_STL_Container<SgNode*> units = NodeQuery::querySubTree(project, V_SgAsmDwarfCompilationUnit);
+    BOOST_FOREACH(SgNode * n, units) {
+        SgAsmDwarfCompilationUnit * unit = isSgAsmDwarfCompilationUnit(n);
+        offsetMapType & offsets = constructOffsetMap(unit);
+        annotateDwarfConstructs(unit, offsets);
 
-    SgSourceFile * newFile = newFileInProject(project);
-    SgGlobal * global = newFile->get_globalScope();
+        SgSourceFile * newFile = newFileInProject(project);
+        SgGlobal * global = newFile->get_globalScope();
 
-    InheritedAttribute attr(NULL);
-    UndwarfTraversal traversal(global);
+        SgAsmDwarfLineList * lines = unit->get_line_info();
+        const SgAsmDwarfLinePtrList & lineList = lines->get_line_list();
+        int id = lineList.front()->get_file_id();
+        SageInterface::attachComment(global, std::string("BEGIN COMPILATION UNIT ") + boost::lexical_cast<std::string>(id));
 
-    Rose_STL_Container<SgNode*> interps = NodeQuery::querySubTree(project, V_SgAsmInterpretationList);
-    BOOST_FOREACH(SgNode * n, interps) {
-        traversal.traverse(n, attr);
+        InheritedAttribute attr(NULL);
+        UndwarfTraversal traversal(global);
+
+        traversal.traverse(unit, attr);
+
+        std::cout << global->unparseToCompleteString() << std::endl << std::endl;
     }
-
-    std::cout << global->unparseToCompleteString() << std::endl;
-
-    delete global;
 
     return 0;
 }                                  

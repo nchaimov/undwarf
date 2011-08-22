@@ -12,23 +12,9 @@ class TypeTable {
             return instance;
         }
 
-        inline std::string typeToName(VariantT t) {
-            if(typeMap.count(t) > 0) {
-                return typeMap[t];
-            } else {
-                return "V_SgTypeUnknown";
-            }
-        }
+        std::string typeToName(VariantT t) ;
 
-
-        inline VariantT nameToType(const std::string & name) {
-            if(nameMap.count(name) > 0) {
-                return nameMap[name];
-            } else {
-                return V_SgTypeUnknown;
-            }
-        }
-
+        VariantT nameToType(const std::string & name) ;
 
         SgType * createType(VariantT v);
         SgType * createType(const std::string & name);

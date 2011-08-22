@@ -1,6 +1,7 @@
 #include "typeTable.h"
 #include "rose.h"
 #include <string>
+#include <boost/algorithm/string/predicate.hpp>
 
 SgType * TypeTable::createType(VariantT t) {
     switch(t) {  
@@ -52,12 +53,34 @@ SgType * TypeTable::createType(VariantT t) {
     }
 }
 
+std::string TypeTable::typeToName(VariantT t) {
+    if(typeMap.count(t) > 0) {
+        return typeMap[t];
+    } else {
+        return "V_SgTypeUnknown";
+    }
+}
+
+VariantT TypeTable::nameToType(const std::string & name) {
+    if(nameMap.count(name) > 0) {
+        return nameMap[name];
+    }  else {
+        std::cerr << "WARNING: Can't identify type " << name << std::endl;
+    }
+    return V_SgTypeUnknown;
+}
+
 SgType * TypeTable::createType(const std::string & name) {
+    if(boost::starts_with(name, "complex ")) {
+        std::string subtype = name.substr(8, std::string::npos);
+        return SageBuilder::buildComplexType(createType(nameToType(subtype)));
+    }
     return createType(nameToType(name));
 }
 
 TypeTable::TypeTable() {
     nameMap["bool"]                       =       V_SgTypeBool;
+    nameMap["_Bool"]                      =       V_SgTypeBool;
     nameMap["char"]                       =       V_SgTypeChar;
     nameMap["double"]                     =       V_SgTypeDouble;     
     nameMap["float"]                      =       V_SgTypeFloat;
@@ -75,47 +98,44 @@ TypeTable::TypeTable() {
     nameMap["signed int"]                 =       V_SgTypeSignedInt;
     nameMap["signed long"]                =       V_SgTypeSignedLong;
     nameMap["signed long int"]            =       V_SgTypeSignedLong;
+    nameMap["long signed int"]            =       V_SgTypeSignedLong;
     nameMap["signed long long"]           =       V_SgTypeSignedLongLong;
     nameMap["signed long long int"]       =       V_SgTypeSignedLongLong;
+    nameMap["long long signed int"]       =       V_SgTypeSignedLongLong;
     nameMap["signed short"]               =       V_SgTypeSignedShort;
     nameMap["signed short int"]           =       V_SgTypeSignedShort;
+    nameMap["short signed int"]           =       V_SgTypeSignedShort;
     nameMap["unsigned char"]              =       V_SgTypeUnsignedChar;
     nameMap["unsigned int"]               =       V_SgTypeUnsignedInt;
     nameMap["unsigned long"]              =       V_SgTypeUnsignedLong;
     nameMap["unsigned long int"]          =       V_SgTypeUnsignedLong;
+    nameMap["long unsigned int"]          =       V_SgTypeUnsignedLong;
     nameMap["unsigned long long"]         =       V_SgTypeUnsignedLongLong;
     nameMap["unsigned long long int"]     =       V_SgTypeUnsignedLongLong;
+    nameMap["long long unsigned int"]     =       V_SgTypeUnsignedLongLong;
     nameMap["unsigned short"]             =       V_SgTypeUnsignedShort;
     nameMap["unsigned short int"]         =       V_SgTypeUnsignedShort;
+    nameMap["short unsigned int"]         =       V_SgTypeUnsignedShort;
 
     typeMap[V_SgTypeBool] = "bool";
     typeMap[V_SgTypeChar] = "char";
     typeMap[V_SgTypeDouble] = "double";     
     typeMap[V_SgTypeFloat] = "float";
     typeMap[V_SgTypeInt] = "int";
-    typeMap[V_SgTypeLong] = "long";
     typeMap[V_SgTypeLong] = "long int";
     typeMap[V_SgTypeLongDouble] = "long double";
-    typeMap[V_SgTypeLongLong] = "long long";
     typeMap[V_SgTypeLongLong] = "long long int";
-    typeMap[V_SgTypeShort] = "short";
     typeMap[V_SgTypeShort] = "short int";
     typeMap[V_SgTypeVoid] = "void";
     typeMap[V_SgTypeWchar] = "wchar_t";
     typeMap[V_SgTypeSignedChar] = "signed char";
     typeMap[V_SgTypeSignedInt] = "signed int";
-    typeMap[V_SgTypeSignedLong] = "signed long";
     typeMap[V_SgTypeSignedLong] = "signed long int";
-    typeMap[V_SgTypeSignedLongLong] = "signed long long";
     typeMap[V_SgTypeSignedLongLong] = "signed long long int";
-    typeMap[V_SgTypeSignedShort] = "signed short";
     typeMap[V_SgTypeSignedShort] = "signed short int";
     typeMap[V_SgTypeUnsignedChar] = "unsigned char";
     typeMap[V_SgTypeUnsignedInt] = "unsigned int";
-    typeMap[V_SgTypeUnsignedLong] = "unsigned long";
     typeMap[V_SgTypeUnsignedLong] = "unsigned long int";
-    typeMap[V_SgTypeUnsignedLongLong] = "unsigned long long";
     typeMap[V_SgTypeUnsignedLongLong] = "unsigned long long int";
-    typeMap[V_SgTypeUnsignedShort] = "unsigned short";
     typeMap[V_SgTypeUnsignedShort] = "unsigned short int";
 }

@@ -8,7 +8,7 @@ class OffsetAttribute;
 namespace DwarfROSE {
 
     extern size_t unnamed_count;
-
+    SgFunctionParameterList * buildEmptyParameterList();
     SgType * typeFromAttribute(OffsetAttribute * a, SgScopeStatement * s);
     SgType * convertType(SgAsmDwarfConstruct * c, SgScopeStatement * s);    
     SgFunctionDeclaration * convertSubprogram(SgAsmDwarfSubprogram * p, SgScopeStatement * s);
