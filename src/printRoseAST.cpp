@@ -34,6 +34,9 @@ visitorTraversal::evaluateInheritedAttribute(SgNode* n, InheritedAttribute inher
     }
     if(s != NULL && e != NULL && !isSgLabelStatement(n)) { 
         printf ("%s (%d, %d, %d)->(%d, %d): %s",n->sage_class_name(),s->get_file_id()+1,s->get_raw_line(),s->get_raw_col(),e->get_raw_line(),e->get_raw_col(),  verbose ? n->unparseToString().c_str() : "" );
+        if(isSgAsmDwarfConstruct(n)) {
+            printf(" [DWARF construct name: %s]", isSgAsmDwarfConstruct(n)->get_name().c_str());
+        }
         SgExprStatement * exprStmt = isSgExprStatement(n);
         if(exprStmt != NULL) {
             printf(" [expr type: %s]", exprStmt->get_expression()->sage_class_name());           
@@ -78,11 +81,17 @@ visitorTraversal::evaluateInheritedAttribute(SgNode* n, InheritedAttribute inher
 			}
 			
 			printf("]");
-		} else {
+            if(isSgAsmDwarfConstruct(n)) {
+                printf(" [DWARF construct name: %s]", isSgAsmDwarfConstruct(n)->get_name().c_str());
+            }
+            } else {
         	printf("%s (%d, %d, %d): %s", n->sage_class_name(),f->get_file_id()+1,f->get_raw_line(),f->get_raw_col(), verbose ? n->unparseToString().c_str() : "");
 		}
     } else {
         printf("%s : %s", n->sage_class_name(), verbose ? n->unparseToString().c_str() : "");
+        if(isSgAsmDwarfConstruct(n)) {
+            printf(" [DWARF construct name: %s]", isSgAsmDwarfConstruct(n)->get_name().c_str());
+        }
     }
     printf(" succ# %lu", n->get_numberOfTraversalSuccessors());
 	printf("\n");

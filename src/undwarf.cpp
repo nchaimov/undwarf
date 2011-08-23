@@ -156,6 +156,7 @@ InheritedAttribute UndwarfTraversal::evaluateInheritedAttribute(SgNode * n, Inhe
 }
 
 int main ( int argc, char* argv[] ) {
+
 	
 	// Parses the input files and generates the AST
 	SgProject* project = frontend(argc,argv);
@@ -173,10 +174,7 @@ int main ( int argc, char* argv[] ) {
         SgSourceFile * newFile = newFileInProject(project);
         SgGlobal * global = newFile->get_globalScope();
 
-        SgAsmDwarfLineList * lines = unit->get_line_info();
-        const SgAsmDwarfLinePtrList & lineList = lines->get_line_list();
-        int id = lineList.front()->get_file_id();
-        SageInterface::attachComment(global, std::string("BEGIN COMPILATION UNIT ") + boost::lexical_cast<std::string>(id));
+        SageInterface::attachComment(global, std::string("BEGIN COMPILATION UNIT ") + unit->get_name());
 
         InheritedAttribute attr(NULL);
         UndwarfTraversal traversal(global);

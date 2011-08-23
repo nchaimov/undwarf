@@ -45,11 +45,12 @@ SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c, SgScopeStatement * scop
             ROSE_ASSERT(attr != NULL);
             SgEnumDeclaration * enumDecl = isSgEnumDeclaration(attr->node);
             if(enumDecl == NULL) {
-                std::cerr << "ERROR: Enumeration type had no associated enumeration declaration." << std::endl;
-                std::cerr << "Node was: " << c->class_name() << " " << c << " " << c->get_name() << std::endl;
-            } else {
-                return SageUtils::buildEnumType(enumDecl);
+                enumDecl = convertEnum(isSgAsmDwarfEnumerationType(c), scope);
+                ROSE_ASSERT(enumDecl != NULL);
+                SageInterface::fixStatement(enumDecl, scope);
+                SageInterface::insertStatementAfterLastDeclaration(enumDecl, scope);
             }
+            return SageUtils::buildEnumType(enumDecl);
         };
 
         // TYPEDEFS
@@ -165,8 +166,30 @@ SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c, SgScopeStatement * scop
 
             return SageBuilder::buildFunctionType(retType, paramList);
         };
-        
 
+        // UPC RELAXED
+        case V_SgAsmDwarfUpcRelaxedType: {
+            OffsetAttribute * attr = OffsetAttribute::get(c);
+            ROSE_ASSERT(attr != NULL);
+            SgType * baseType = typeFromAttribute(attr, scope);
+            return SageBuilder::buildUpcRelaxedType(baseType);
+        };
+        
+        // UPC STRICT
+        case V_SgAsmDwarfUpcStrictType: {
+            OffsetAttribute * attr = OffsetAttribute::get(c);
+            ROSE_ASSERT(attr != NULL);
+            SgType * baseType = typeFromAttribute(attr, scope);
+            return SageBuilder::buildUpcStrictType(baseType);
+        };
+
+        // UPC SHARED
+        case V_SgAsmDwarfUpcSharedType: {
+            OffsetAttribute * attr = OffsetAttribute::get(c);
+            ROSE_ASSERT(attr != NULL);
+            SgType * baseType = typeFromAttribute(attr, scope);
+            return SageBuilder::buildUpcSharedType(baseType);
+        };
 
         default: 
             std::cerr << "Unhandled type " << c->class_name() << " " << c->get_name() << std::endl;
@@ -182,19 +205,29 @@ SgFunctionDeclaration * DwarfROSE::convertSubprogram(SgAsmDwarfSubprogram * s, S
     }
     
     std::string name = s->get_name();
+    if(name.empty()) {
+        name = "_UNNAMED_FUNCTION_" + boost::lexical_cast<std::string>(unnamed_count++) + "_";
+    }
     OffsetAttribute * attr = OffsetAttribute::get(s);
     SgType * retType = typeFromAttribute(attr, scope);
 
     SgFunctionParameterList * paramList = SageUtils::buildEmptyParameterList();
 
-    Rose_STL_Container<SgNode*> formalParams = NodeQuery::querySubTree(s, V_SgAsmDwarfFormalParameter);
-    BOOST_FOREACH(SgNode * n, formalParams) {
-        SgAsmDwarfFormalParameter * formalParam = isSgAsmDwarfFormalParameter(n);
-        std::string paramName = formalParam->get_name();
-        OffsetAttribute * paramAttr = OffsetAttribute::get(formalParam);
-        SgType * paramType = typeFromAttribute(paramAttr, scope);
-        SgInitializedName * initName = SageBuilder::buildInitializedName(paramName, paramType);
-        SageInterface::appendArg(paramList, initName);
+    // subroutines can contain inlined subroutines; we don't want to find their formal parameters
+    //Rose_STL_Container<SgNode*> formalParams = NodeQuery::querySubTree(s, V_SgAsmDwarfFormalParameter);
+    SgAsmDwarfConstructList * cList = s->get_body();
+    if(cList != NULL) {
+        const SgAsmDwarfConstructPtrList & children = cList->get_list();
+        BOOST_FOREACH(SgAsmDwarfConstruct * n, children) {
+            SgAsmDwarfFormalParameter * formalParam = isSgAsmDwarfFormalParameter(n);
+            if(formalParam != NULL) {
+                std::string paramName = formalParam->get_name();
+                OffsetAttribute * paramAttr = OffsetAttribute::get(formalParam);
+                SgType * paramType = typeFromAttribute(paramAttr, scope);
+                SgInitializedName * initName = SageBuilder::buildInitializedName(paramName, paramType);
+                SageInterface::appendArg(paramList, initName);
+            }
+        }
     }
 
     SgFunctionDeclaration * decl = SageBuilder::buildNondefiningFunctionDeclaration(SgName(name), retType, paramList);
@@ -283,6 +316,10 @@ SgVariableDeclaration * DwarfROSE::convertMember(SgAsmDwarfMember * m, SgScopeSt
     std::string name = m->get_name();
     SgType * type = typeFromAttribute(attr, scope);
     SgVariableDeclaration * decl = SageBuilder::buildVariableDeclaration(SgName(name), type);
+    uint64_t bitfield = m->get_bit_size();
+    if(bitfield > 0) {
+        decl->set_bitfield(SageBuilder::buildUnsignedLongVal(bitfield));
+    }
     attr->node = decl;
     return decl;
 
