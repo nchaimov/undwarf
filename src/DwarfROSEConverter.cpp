@@ -206,7 +206,8 @@ SgFunctionDeclaration * DwarfROSE::convertSubprogram(SgAsmDwarfSubprogram * s, S
     
     std::string name = s->get_name();
     if(name.empty()) {
-        name = "_UNNAMED_FUNCTION_" + boost::lexical_cast<std::string>(unnamed_count++) + "_";
+        //name = "_UNNAMED_FUNCTION_" + boost::lexical_cast<std::string>(unnamed_count++) + "_";
+        return NULL;
     }
     OffsetAttribute * attr = OffsetAttribute::get(s);
     SgType * retType = typeFromAttribute(attr, scope);
