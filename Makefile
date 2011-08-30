@@ -25,7 +25,7 @@ CC                    = gcc
 CXX                   = g++
 CPPFLAGS              = $(BOOST_CPPFLAGS) -I$(ROSE_DWARF_INCLUDES)
 #CXXCPPFLAGS           = @CXXCPPFLAGS@
-CXXFLAGS              = -g -Wall -DDEBUG
+CXXFLAGS              = -gdwarf-2 -g3 -Wall -DDEBUG
 LDFLAGS               = -L$(ROSE_DWARF_LIBS_WITH_PATH) -L/mnt/netapp/home2/nchaimov/boost/lib -L/mnt/netapp/home2/nchaimov/lib -static -pthread -Wl,--start-group -lpthread -lboost_system -lboost_wave -lhpdf -lrose -lm -lboost_date_time -lboost_thread -lboost_filesystem -lgcrypt -lgpg-error -lboost_program_options -lboost_regex -lelf -ldwarf -Wl,--end-group 
 
 #ROSE_LIBS = $(ROSE_LIB_DIR)/librose.la
@@ -34,7 +34,7 @@ LDFLAGS               = -L$(ROSE_DWARF_LIBS_WITH_PATH) -L/mnt/netapp/home2/nchai
 ROSE_SOURCE_DIR = ./src
  
 
-executableFiles = printRoseAST undwarf
+executableFiles = printRoseAST undwarf readtest
 
 
 # Default make rule to use
@@ -49,6 +49,9 @@ dlstubs.o: $(ROSE_SOURCE_DIR)/dlstubs.c
 
 printRoseAST: $(ROSE_SOURCE_DIR)/printRoseAST.cpp dlstubs.o
 	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ $(ROSE_SOURCE_DIR)/printRoseAST.cpp dlstubs.o $(LIBS_WITH_RPATH) -L$(ROSE_LIB_DIR) $(LDFLAGS) -z muldefs  
+
+readtest: $(ROSE_SOURCE_DIR)/readtest.cpp dlstubs.o
+	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ $(ROSE_SOURCE_DIR)/readtest.cpp dlstubs.o $(LIBS_WITH_RPATH) -L$(ROSE_LIB_DIR) $(LDFLAGS) -z muldefs  
 
 undwarf.o: $(ROSE_SOURCE_DIR)/undwarf.cpp $(ROSE_SOURCE_DIR)/typeTable.h
 	$(CXX) -I$(ROSE_INCLUDE_DIR) $(CPPFLAGS) $(CXXFLAGS) -o $@ -c $(ROSE_SOURCE_DIR)/undwarf.cpp

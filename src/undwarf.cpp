@@ -29,11 +29,11 @@ offsetMapType & constructOffsetMap(SgNode * top) {
         SgAsmDwarfConstruct * construct = isSgAsmDwarfConstruct(n);
         ROSE_ASSERT(construct != NULL);
         std::string offsetStr = "<" + boost::lexical_cast<std::string>(construct->get_offset()) + ">";
-        std::string name = construct->get_name();
-        if(name.empty()) {
-            name = "<unnamed>";
-        }
         if(SageInterface::getProject()->get_verbose() > 0) {
+            std::string name = construct->get_name();
+            if(name.empty()) {
+                name = "<unnamed>";
+            }
             std::cerr << construct->class_name() << " " << name << " is " << offsetStr << std::endl;
         }
         (*offsetMap)[offsetStr] = construct;
@@ -41,8 +41,6 @@ offsetMapType & constructOffsetMap(SgNode * top) {
 
     return *offsetMap;
 }
-
-
 
 void annotateDwarfConstructs(SgNode * top, offsetMapType & map) {
     Rose_STL_Container<SgNode*> constructs = NodeQuery::querySubTree(top, V_SgAsmDwarfConstruct);
@@ -52,10 +50,13 @@ void annotateDwarfConstructs(SgNode * top, offsetMapType & map) {
         attr->add(construct);
         if(map.count(construct->get_type_ref()) > 0) {
             attr->type = map[construct->get_type_ref()];
-        }
-        else if(SageInterface::getProject()->get_verbose() > 0 ) {
+        } else if(SageInterface::getProject()->get_verbose() > 0 ) {
             std::cerr << "Skipping annotation of " << construct->class_name() << " \"" <<  construct->get_name() << "\" because it has no entry in the offset map." << std::endl;
         } 
+
+        if(map.count(construct->get_spec_ref()) > 0) {
+            attr->spec = map[construct->get_spec_ref()];
+        }   
     }
 }
 
@@ -89,7 +90,10 @@ void fixEnumDeclaration(SgEnumDeclaration * e, SgScopeStatement * scope) {
     }
     e->set_parent(scope);
     e->set_scope(scope);
-}
+    SgEnumSymbol * sym = new SgEnumSymbol(e);
+    scope->insert_symbol(e->get_name(), sym);
+    
+}                                   
 
 InheritedAttribute UndwarfTraversal::evaluateInheritedAttribute(SgNode * n, InheritedAttribute a) {
     SgScopeStatement * parentScope = a.parentScope;
@@ -124,17 +128,53 @@ InheritedAttribute UndwarfTraversal::evaluateInheritedAttribute(SgNode * n, Inhe
         };
 
         case V_SgAsmDwarfStructureType: {
-            SgClassDeclaration * structDecl = DwarfROSE::convertStruct(isSgAsmDwarfStructureType(n), scope);
-            parentScope = structDecl->get_definition();
-            newDecl = structDecl;
+            OffsetAttribute * attr = OffsetAttribute::get(n);
+            if(attr != NULL && attr->node != NULL && isSgClassDeclaration(attr->node)) {
+                parentScope = isSgClassDeclaration(attr->node)->get_definition();
+            } else {
+                SgClassDeclaration * structDecl = DwarfROSE::convertStruct(isSgAsmDwarfStructureType(n), scope);
+                parentScope = structDecl->get_definition();
+                newDecl = structDecl;
+            }
             break;
         };
 
         case V_SgAsmDwarfUnionType: {
-            SgClassDeclaration * unionDecl = DwarfROSE::convertUnion(isSgAsmDwarfUnionType(n), scope);
-            parentScope = unionDecl->get_definition();
-            newDecl = unionDecl;
+            OffsetAttribute * attr = OffsetAttribute::get(n);
+            if(attr != NULL && attr->node != NULL && isSgClassDeclaration(attr->node)) {
+                parentScope = isSgClassDeclaration(attr->node)->get_definition();
+            } else {
+                SgClassDeclaration * unionDecl = DwarfROSE::convertUnion(isSgAsmDwarfUnionType(n), scope);
+                parentScope = unionDecl->get_definition();
+                newDecl = unionDecl;
+            }
             break;
+        };
+
+        case V_SgAsmDwarfClassType: {
+            OffsetAttribute * attr = OffsetAttribute::get(n);
+            if(attr != NULL && attr->node != NULL && isSgClassDeclaration(attr->node)) {
+                parentScope = isSgClassDeclaration(attr->node)->get_definition();
+            } else {
+                SgClassDeclaration * classDecl = DwarfROSE::convertClass(isSgAsmDwarfClassType(n), scope);
+                parentScope = classDecl->get_definition();
+                newDecl = classDecl;
+            }
+            break;
+        };                       
+
+        case V_SgAsmDwarfNamespace: {
+            OffsetAttribute * attr = OffsetAttribute::get(n);
+            SgAsmDwarfNamespace * ns = isSgAsmDwarfNamespace(n);
+            std::string spec = ns->get_spec_ref();
+            if(attr != NULL && attr->node != NULL && isSgNamespaceDeclarationStatement(attr->node)) {
+                parentScope = isSgNamespaceDeclarationStatement(attr->node)->get_definition();
+            } else {
+                SgNamespaceDeclarationStatement * nsDecl = DwarfROSE::convertNamespace(isSgAsmDwarfNamespace(n), scope);
+                parentScope = nsDecl->get_definition();
+                newDecl = nsDecl;
+            }
+            break;                            
         };
 
         case V_SgAsmDwarfMember: {
@@ -142,6 +182,7 @@ InheritedAttribute UndwarfTraversal::evaluateInheritedAttribute(SgNode * n, Inhe
             newDecl = varDecl;
             break;
         };
+
 
 
         default: ; // Do nothing
@@ -156,8 +197,6 @@ InheritedAttribute UndwarfTraversal::evaluateInheritedAttribute(SgNode * n, Inhe
 }
 
 int main ( int argc, char* argv[] ) {
-
-	
 	// Parses the input files and generates the AST
 	SgProject* project = frontend(argc,argv);
 	ROSE_ASSERT (project != NULL);
@@ -173,6 +212,9 @@ int main ( int argc, char* argv[] ) {
 
         SgSourceFile * newFile = newFileInProject(project);
         SgGlobal * global = newFile->get_globalScope();
+        SageInterface::setSourcePositionForTransformation(global);
+        global->set_startOfConstruct(Sg_File_Info::generateDefaultFileInfoForTransformationNode());
+        global->set_endOfConstruct(Sg_File_Info::generateDefaultFileInfoForTransformationNode());
 
         SageInterface::attachComment(global, std::string("BEGIN COMPILATION UNIT ") + unit->get_name());
 
@@ -180,6 +222,20 @@ int main ( int argc, char* argv[] ) {
         UndwarfTraversal traversal(global);
 
         traversal.traverse(unit, attr);
+
+        //AstPostProcessing(global);
+        //AstTests::runAllTests(project);
+
+        //Rose_STL_Container<SgNode*> statements = NodeQuery::querySubTree(global, V_SgClassDeclaration);
+        //BOOST_FOREACH(SgNode * st, statements) {
+        //    SgStatement * statement = isSgStatement(st);
+        //    std::cerr << "Statement: " << statement->unparseToString() << std::endl;
+        //    const std::vector<SgDeclarationStatement*> & depDecls = SageInterface::getDependentDeclarations(statement);
+        //    BOOST_FOREACH(SgDeclarationStatement * depDecl, depDecls) {
+        //        std::cerr << "Depends on: " << depDecl->unparseToString() << std::endl;
+        //    }
+        //    std::cerr << std::endl;
+        //}
 
         std::cout << global->unparseToCompleteString() << std::endl << std::endl;
     }

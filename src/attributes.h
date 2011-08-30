@@ -8,9 +8,10 @@ class OffsetAttribute : public AstAttribute {
     public:
         SgAsmDwarfConstruct * type;
         SgNode * node;
+        SgAsmDwarfConstruct * spec;
 
-        OffsetAttribute(SgAsmDwarfConstruct * t = NULL,
-                SgNode * n = NULL) : type(t), node(n) {};
+        OffsetAttribute(SgAsmDwarfConstruct * t = NULL, SgNode * n = NULL, SgAsmDwarfConstruct * s = NULL) 
+            : type(t), node(n), spec(s) {};
         
         static const std::string OFFSET_ATTRIBUTE;
 
