@@ -115,9 +115,11 @@ InheritedAttribute UndwarfTraversal::evaluateInheritedAttribute(SgNode * n, Inhe
         };
 
         case V_SgAsmDwarfSubprogram: {
-            SgFunctionDeclaration * funcDecl = DwarfROSE::convertSubprogram(isSgAsmDwarfSubprogram(n), scope);
-            //parentScope = funcDecl;
-            newDecl = funcDecl;
+            SgAsmDwarfSubprogram * sub = isSgAsmDwarfSubprogram(n);
+            if(!sub->get_artificiality()) {
+                SgFunctionDeclaration * funcDecl = DwarfROSE::convertSubprogram(sub, scope);
+                newDecl = funcDecl;
+            }
             break;
         };
 
@@ -163,6 +165,7 @@ InheritedAttribute UndwarfTraversal::evaluateInheritedAttribute(SgNode * n, Inhe
             break;
         };                       
 
+
         case V_SgAsmDwarfNamespace: {
             OffsetAttribute * attr = OffsetAttribute::get(n);
             SgAsmDwarfNamespace * ns = isSgAsmDwarfNamespace(n);
@@ -178,12 +181,22 @@ InheritedAttribute UndwarfTraversal::evaluateInheritedAttribute(SgNode * n, Inhe
         };
 
         case V_SgAsmDwarfMember: {
-            SgVariableDeclaration * varDecl = DwarfROSE::convertMember(isSgAsmDwarfMember(n), scope);
-            newDecl = varDecl;
+            SgAsmDwarfMember * mem = isSgAsmDwarfMember(n);
+            if(!mem->get_artificiality()) {
+                SgVariableDeclaration * varDecl = DwarfROSE::convertMember(mem, scope);
+                newDecl = varDecl;
+            }
             break;
         };
 
-
+        case V_SgAsmDwarfInheritance: {
+            SgBaseClass * baseClass = DwarfROSE::convertInheritance(isSgAsmDwarfInheritance(n), scope);
+            SgClassDefinition * classDefn = isSgClassDefinition(scope);
+            if(baseClass != NULL && classDefn != NULL) {
+                classDefn->get_inheritances().push_back(baseClass);
+            }
+            break;                              
+        };
 
         default: ; // Do nothing
     }

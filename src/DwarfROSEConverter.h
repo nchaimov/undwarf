@@ -18,6 +18,7 @@ namespace DwarfROSE {
     SgClassDeclaration * convertUnion(SgAsmDwarfUnionType * t, SgScopeStatement * s);
     SgClassDeclaration * convertClass(SgAsmDwarfClassType * t, SgScopeStatement * s);
     SgVariableDeclaration * convertMember(SgAsmDwarfMember * m, SgScopeStatement * s);
+    SgBaseClass * convertInheritance(SgAsmDwarfInheritance * m, SgScopeStatement * s);
     SgNamespaceDeclarationStatement * convertNamespace(SgAsmDwarfNamespace * n, SgScopeStatement * s);
 }
 

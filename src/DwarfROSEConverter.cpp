@@ -4,12 +4,15 @@
 #include "typeTable.h"
 #include "attributes.h"
 #include "sageUtils.h"
+#include "dwarf.h"
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 
 size_t DwarfROSE::unnamed_count = 0;
 
+// Generate the SgType representing the type held in the offset attribute.
+// Requires that the offset attributes have been generated.
 SgType * DwarfROSE::typeFromAttribute(OffsetAttribute * attr, SgScopeStatement * scope) {
     if(attr == NULL) {
         return SageBuilder::buildVoidType();
@@ -18,6 +21,7 @@ SgType * DwarfROSE::typeFromAttribute(OffsetAttribute * attr, SgScopeStatement *
     }
 }
 
+// Convert a DWARF type node into an SgType
 SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c, SgScopeStatement * scope) {
     if(c == NULL) {
         return SageBuilder::buildVoidType();
@@ -38,6 +42,19 @@ SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c, SgScopeStatement * scop
                 pointedTo = convertType(attr->type, scope);
             }
             return SageBuilder::buildPointerType(pointedTo);
+        };
+                                           
+        // REFERENCES
+        case V_SgAsmDwarfReferenceType: {
+            OffsetAttribute * attr = OffsetAttribute::get(c);
+            SgType * referredTo = NULL;
+            if(attr == NULL) {
+                std::cerr << "WARNING: Reference doesn't refer to any type." << std::endl;
+                referredTo = SageBuilder::buildUnknownType();
+            } else {
+                referredTo = convertType(attr->type, scope);
+            }
+            return SageBuilder::buildReferenceType(referredTo);
         };
 
         // ENUMS
@@ -85,7 +102,14 @@ SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c, SgScopeStatement * scop
             OffsetAttribute * attr = OffsetAttribute::get(c);
             ROSE_ASSERT(attr != NULL);
             SgType * baseType = typeFromAttribute(attr, scope);
-            return SageBuilder::buildConstType(baseType);
+            if(isSgReferenceType(baseType)) {
+                // DWARF seems to wrap references in consts to indicate that what they
+                // refer to can't be changed, but we don't actually want to make a const
+                // reference, since that's not syntactically correct.
+                return baseType;
+            } else {
+                return SageBuilder::buildConstType(baseType);
+            }
         };
 
         // VOLATILE
@@ -96,7 +120,7 @@ SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c, SgScopeStatement * scop
             return SageBuilder::buildVolatileType(baseType);
         };
 
-        // STRUCTS, UNIONS
+        // STRUCTS, UNIONS, CLASSES
         case V_SgAsmDwarfClassType:
         case V_SgAsmDwarfStructureType:
         case V_SgAsmDwarfUnionType: {
@@ -132,9 +156,14 @@ SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c, SgScopeStatement * scop
                     if(isSgAsmDwarfUnionType(c)->get_body() == NULL) {
                         newDecl->set_forward(true);
                     }
-                } else if(name.empty()) {
-                    name = "_UNNAMED_CLASS_" + boost::lexical_cast<std::string>(unnamed_count++);
+                } else {
+                    if(name.empty()) {
+                        name = "_UNNAMED_CLASS_" + boost::lexical_cast<std::string>(unnamed_count++);
+                    }
                     newDecl = SageBuilder::buildClassDeclaration(name, parentScope);
+                    if(isSgAsmDwarfClassType(c)->get_body() == NULL) {
+                        newDecl->set_forward(true);
+                    }
                 }
                 SgClassDeclaration * forwardDecl = SageBuilder::buildNondefiningClassDeclaration_nfi(SgName(name),
                         classType, parentScope);
@@ -190,10 +219,22 @@ SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c, SgScopeStatement * scop
                 SageInterface::appendArg(paramList, initName);
             }
 
-            SgType * t = SageBuilder::buildFunctionType(retType, paramList);
+            // 
+            SgClassDefinition * classDef = isSgClassDefinition(scope);
+            SgType * t = NULL;
+            // I'd think that member functions should be of member function type, but doing this causes the
+            // function signature to be unparsed incorrectly (instead of class X *, class X { body of class } *).
+            //if(classDef != NULL) {
+            //    t = SageBuilder::buildMemberFunctionType(retType, SageBuilder::buildFunctionParameterTypeList(paramList), classDef, 0);
+            //} else {
+                t = SageBuilder::buildFunctionType(retType, paramList);
+            //}
+
+            // ROSE requires that a function declaration have a name.
             if(name.empty()) {
                 name = "_FUNCTION_POINTER_" + boost::lexical_cast<std::string>(unnamed_count++);
             }
+            // Build a function declaration to be the parameter list's parent (AST tests fail otherwise.)
             SgFunctionDeclaration * decl = SageBuilder::buildNondefiningFunctionDeclaration(SgName(name), retType, paramList);
             paramList->set_parent(decl);
             decl->set_parent(t);
@@ -233,6 +274,7 @@ SgType * DwarfROSE::convertType(SgAsmDwarfConstruct * c, SgScopeStatement * scop
 }
 
 
+// Convert DWARF subprogram tag into an SgFunctionDeclaration
 SgFunctionDeclaration * DwarfROSE::convertSubprogram(SgAsmDwarfSubprogram * s, SgScopeStatement * scope) {
     if(s == NULL) {
         return NULL;
@@ -243,8 +285,38 @@ SgFunctionDeclaration * DwarfROSE::convertSubprogram(SgAsmDwarfSubprogram * s, S
         //name = "_UNNAMED_FUNCTION_" + boost::lexical_cast<std::string>(unnamed_count++) + "_";
         return NULL;
     }
+
+
+    // Determine if this function is a constructor
+    SgClassDefinition * classDef = isSgClassDefinition(scope);
+    bool isConstructor = false;
+    bool isDestructor = false;
+    bool isOperator = false;
+    bool isCast = false;
+    bool isInClass = false;
+    if(classDef != NULL) {
+        isInClass = true;
+        SgClassType * type = classDef->get_declaration()->get_type();
+        if(name.compare(type->get_name().getString()) == 0) {
+            isConstructor = true;
+        } else if(boost::starts_with(name, "~")) {
+            isDestructor = true;
+        } else if(boost::starts_with(name, "operator")) {
+            if(SageUtils::operatorIsCast(name)) {
+                isCast = true;
+            }
+            isOperator = true;
+        }
+    }
+
+    // Determine return type
     OffsetAttribute * attr = OffsetAttribute::get(s);
-    SgType * retType = typeFromAttribute(attr, scope);
+    SgType * retType = NULL;
+    if(isConstructor || isDestructor) {
+        retType = SgTypeDefault::createType();
+    } else {
+        retType = typeFromAttribute(attr, scope);
+    }
 
     SgFunctionParameterList * paramList = SageUtils::buildEmptyParameterList();
 
@@ -265,7 +337,14 @@ SgFunctionDeclaration * DwarfROSE::convertSubprogram(SgAsmDwarfSubprogram * s, S
         }
     }
 
-    SgFunctionDeclaration * decl = SageBuilder::buildNondefiningFunctionDeclaration(SgName(name), retType, paramList);
+
+    SgFunctionDeclaration * decl = NULL;
+    
+    if(isInClass) {
+        decl = SageBuilder::buildNondefiningMemberFunctionDeclaration(SgName(name), retType, paramList, scope);
+    } else {
+        decl = SageBuilder::buildNondefiningFunctionDeclaration(SgName(name), retType, paramList, scope);
+    }
     switch(s->get_accessibility()) {
         case 2:
             decl->get_declarationModifier().get_accessModifier().setProtected();
@@ -275,6 +354,29 @@ SgFunctionDeclaration * DwarfROSE::convertSubprogram(SgAsmDwarfSubprogram * s, S
             break;
         default:
             decl->get_declarationModifier().get_accessModifier().setPublic();
+    }
+
+    if(isConstructor) {
+        decl->get_specialFunctionModifier().setConstructor();
+    } else if(isDestructor) {
+        decl->get_specialFunctionModifier().setDestructor();
+    } else if(isOperator) {
+        decl->get_specialFunctionModifier().setOperator();
+        if(isCast) {
+            decl->get_specialFunctionModifier().setConversion();
+        }
+    }
+
+    switch(s->get_virtuality()) {
+        case DW_VIRTUALITY_virtual:
+            decl->get_functionModifier().setVirtual();
+            break;
+        case DW_VIRTUALITY_pure_virtual:
+            decl->get_functionModifier().setPureVirtual();
+            break;
+        case DW_VIRTUALITY_none:
+        default:
+            ; // Do nothing
     }
 
     return decl;
@@ -386,6 +488,51 @@ SgVariableDeclaration * DwarfROSE::convertMember(SgAsmDwarfMember * m, SgScopeSt
 
 }
 
+SgBaseClass * DwarfROSE::convertInheritance(SgAsmDwarfInheritance * i, SgScopeStatement * scope) {
+    if(i == NULL) {
+        return NULL;
+    }
+
+    OffsetAttribute * attr = OffsetAttribute::get(i);
+    ROSE_ASSERT(attr != NULL);
+    if(attr->type == NULL) {
+        std::cerr << "WARNING: Inheritance had no type." << std::endl;
+    } else {
+        OffsetAttribute * typeAttr = OffsetAttribute::get(attr->type);
+        ROSE_ASSERT(typeAttr != NULL);
+        if(typeAttr->node == NULL) {
+            convertType(attr->type, scope);
+        } 
+        SgClassDeclaration * decl = isSgClassDeclaration(typeAttr->node);
+        if(decl == NULL) {
+            std::cerr << "WARNING: Inheritance type is not a class type." << std::endl;
+        } else {
+            SgBaseClass * baseClass = new SgBaseClass(decl);
+            SageInterface::setOneSourcePositionForTransformation(baseClass);
+            // public, private, protected inheritance
+            switch(i->get_accessibility()) {
+                case 2:
+                    baseClass->get_baseClassModifier().get_accessModifier().setProtected();
+                    break;
+                case 0:
+                case 3:
+                    baseClass->get_baseClassModifier().get_accessModifier().setPrivate();
+                    break;
+                case 1:
+                default:
+                    baseClass->get_baseClassModifier().get_accessModifier().setPublic();
+            }
+            // virtual inheritance
+            if(i->get_virtuality() != 0) {
+                baseClass->get_baseClassModifier().setVirtual();
+            }
+            return baseClass;
+        }
+    }
+
+    return NULL;
+}
+
 SgClassDeclaration * DwarfROSE::convertClass(SgAsmDwarfClassType * s, SgScopeStatement * scope) {
     if(s == NULL) {
         return NULL;
@@ -436,12 +583,14 @@ SgNamespaceDeclarationStatement * DwarfROSE::convertNamespace(SgAsmDwarfNamespac
         unnamed = true;
     }
     SgNamespaceDeclarationStatement * decl = SageBuilder::buildNamespaceDeclaration_nfi(SgName(name), unnamed, scope);
-    ROSE_ASSERT(decl != NULL);                                                                                        
+    ROSE_ASSERT(decl != NULL);
+    SageInterface::setOneSourcePositionForTransformation(decl);
     SageInterface::setOneSourcePositionForTransformation(decl->get_firstNondefiningDeclaration());
     attr->node = decl;
     if(s->get_body() == NULL || s->get_body()->get_list().empty()) {
         decl->set_forward(true);
     }
+
     SageBuilder::buildNamespaceDefinition(decl);
     return decl;
 }
