@@ -77,9 +77,25 @@ bool SageUtils::operatorIsCast(std::string name) {
         || name == "operator!"
         || name == "operator[]"
         || name == "operator->"
-        || name == "operator." ) {
+        || name == "operator."
+        || name == "operatornew"
+        || name == "operatornew[]"
+        || name == "operatordelete"
+        || name == "operatordelete[]"
+        || name == "operator()"
+        ) {
             return false;
         } else {
             return true;
         }
+}
+
+void SageUtils::addComment(const std::string & comment, SgScopeStatement * scope) {
+    PreprocessingInfo::RelativePositionType pos;
+    if(isSgGlobal(scope)) {
+        pos = PreprocessingInfo::after;    
+    } else {
+        pos = PreprocessingInfo::inside;
+    }
+    SageInterface::attachComment(scope, comment, pos);
 }

@@ -294,6 +294,7 @@ SgFunctionDeclaration * DwarfROSE::convertSubprogram(SgAsmDwarfSubprogram * s, S
     bool isOperator = false;
     bool isCast = false;
     bool isInClass = false;
+    bool isTemplate = false;
     if(classDef != NULL) {
         isInClass = true;
         SgClassType * type = classDef->get_declaration()->get_type();
@@ -307,6 +308,17 @@ SgFunctionDeclaration * DwarfROSE::convertSubprogram(SgAsmDwarfSubprogram * s, S
             }
             isOperator = true;
         }
+    }                       
+    if(boost::contains(name, "<") && boost::contains(name, ">")) {
+        isTemplate = true;
+        // Unless and until we figure out a way to handle template functions,
+        // we just output a warning and give up.
+        std::cerr << "WARNING: Skipping generation of wrapper declaration for function " << s->get_linkage_name() << 
+            " because it is an instantiation of a template." << std::endl;
+        if(scope != NULL) {
+            SageUtils::addComment("Omitted template function " + s->get_linkage_name(), scope);
+        }
+        return NULL;
     }
 
     // Determine return type
@@ -555,6 +567,13 @@ SgClassDeclaration * DwarfROSE::convertClass(SgAsmDwarfClassType * s, SgScopeSta
         }
     } else {
         std::string name = s->get_name();
+        if(boost::contains(name, "<") && boost::contains(name, ">")) {
+            std::cerr << "WARNING: Skipping generation of declaration for class " << s->get_linkage_name() << " because it is an instantiation of a template." << std::endl;
+            if(scope != NULL) {
+                SageUtils::addComment("Omitted template class " + name, scope);
+                return NULL;
+            }
+        }
         if(name.empty()) {
             name = "_UNNAMED_CLASS_" + boost::lexical_cast<std::string>(unnamed_count++) + "_";
         }

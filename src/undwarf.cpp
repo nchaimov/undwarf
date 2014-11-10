@@ -21,7 +21,7 @@
     
 static TypeTable & typeTable = TypeTable::getInstance();
 
-offsetMapType & constructOffsetMap(SgNode * top) {
+static offsetMapType & constructOffsetMap(SgNode * top) {
     offsetMapType * offsetMap = new offsetMapType();
 
     Rose_STL_Container<SgNode*> constructs = NodeQuery::querySubTree(top, V_SgAsmDwarfConstruct);
@@ -42,7 +42,7 @@ offsetMapType & constructOffsetMap(SgNode * top) {
     return *offsetMap;
 }
 
-void annotateDwarfConstructs(SgNode * top, offsetMapType & map) {
+static void annotateDwarfConstructs(SgNode * top, offsetMapType & map) {
     Rose_STL_Container<SgNode*> constructs = NodeQuery::querySubTree(top, V_SgAsmDwarfConstruct);
     BOOST_FOREACH(SgNode * n, constructs) {
         SgAsmDwarfConstruct * construct = isSgAsmDwarfConstruct(n);
@@ -83,7 +83,7 @@ class UndwarfTraversal : public AstTopDownProcessing<InheritedAttribute> {
 
 };
 
-void fixEnumDeclaration(SgEnumDeclaration * e, SgScopeStatement * scope) {
+static void fixEnumDeclaration(SgEnumDeclaration * e, SgScopeStatement * scope) {
     SgInitializedNamePtrList & initNames = e->get_enumerators();
     BOOST_FOREACH(SgInitializedName * initName, initNames) {
         initName->set_scope(scope);
@@ -116,6 +116,7 @@ InheritedAttribute UndwarfTraversal::evaluateInheritedAttribute(SgNode * n, Inhe
 
         case V_SgAsmDwarfSubprogram: {
             SgAsmDwarfSubprogram * sub = isSgAsmDwarfSubprogram(n);
+            // Compiler-generated functions are marked artificial
             if(!sub->get_artificiality()) {
                 SgFunctionDeclaration * funcDecl = DwarfROSE::convertSubprogram(sub, scope);
                 newDecl = funcDecl;
@@ -159,8 +160,10 @@ InheritedAttribute UndwarfTraversal::evaluateInheritedAttribute(SgNode * n, Inhe
                 parentScope = isSgClassDeclaration(attr->node)->get_definition();
             } else {
                 SgClassDeclaration * classDecl = DwarfROSE::convertClass(isSgAsmDwarfClassType(n), scope);
-                parentScope = classDecl->get_definition();
-                newDecl = classDecl;
+                if(classDecl != NULL) {
+                    parentScope = classDecl->get_definition();
+                    newDecl = classDecl;
+                }
             }
             break;
         };                       
@@ -225,31 +228,22 @@ int main ( int argc, char* argv[] ) {
 
         SgSourceFile * newFile = newFileInProject(project);
         SgGlobal * global = newFile->get_globalScope();
+        // Make sure the global scope is marked as a transformation
+        // or it won't unparse correctly.
         SageInterface::setSourcePositionForTransformation(global);
         global->set_startOfConstruct(Sg_File_Info::generateDefaultFileInfoForTransformationNode());
         global->set_endOfConstruct(Sg_File_Info::generateDefaultFileInfoForTransformationNode());
 
+        // Note in the output what the source of the code was.
         SageInterface::attachComment(global, std::string("BEGIN COMPILATION UNIT ") + unit->get_name());
 
+        // Generate the header
         InheritedAttribute attr(NULL);
         UndwarfTraversal traversal(global);
-
         traversal.traverse(unit, attr);
 
-        //AstPostProcessing(global);
-        //AstTests::runAllTests(project);
 
-        //Rose_STL_Container<SgNode*> statements = NodeQuery::querySubTree(global, V_SgClassDeclaration);
-        //BOOST_FOREACH(SgNode * st, statements) {
-        //    SgStatement * statement = isSgStatement(st);
-        //    std::cerr << "Statement: " << statement->unparseToString() << std::endl;
-        //    const std::vector<SgDeclarationStatement*> & depDecls = SageInterface::getDependentDeclarations(statement);
-        //    BOOST_FOREACH(SgDeclarationStatement * depDecl, depDecls) {
-        //        std::cerr << "Depends on: " << depDecl->unparseToString() << std::endl;
-        //    }
-        //    std::cerr << std::endl;
-        //}
-
+        // Print the generated header.
         std::cout << global->unparseToCompleteString() << std::endl << std::endl;
     }
 
